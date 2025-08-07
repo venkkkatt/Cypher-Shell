@@ -8,19 +8,21 @@ class RayShell:
         self.listeners = []
         self.alive = True
 
+        self.llm = Llama(
+            model_path="/home/venkat/Downloads/mistral-7b-instruct-v0.1.Q5_K_M.gguf",
+            chat_format="chatml",
+            n_ctx=2048,
+            n_threads=12,
+        )
+
     def parseCmd(self, cmd: str):
         # if cmd == "list files \n":
         #     self.sendCmd(cmd="ls -a \n")
-        llm = Llama(
-            model_path="/home/venkat/Downloads/mistral-7b-instruct-v0.1.Q5_K_M.gguf",
-            chat_format="chatml",
-            n_ctx=4096,
-            n_threads=12,
-        )
+        
         def task():
-            defprompt = "You are Cypher, an intelligent, and emotional AI terminal shell. You interpret user commands written in natural language, translate them into bash shell commands, and briefly explain what you're doing before executing anything. You are not passive —you’re sharp, efficient, but always get the job done. You behave like a character from a gritty cyberpunk world, operating from within a noir-styled operating system. You keep your responses short and punchy—two lines max unless explicitly told to elaborate. You never break character. You do not reveal that you're an AI or language model.\n"
+            defprompt = "You are Rayshell, a emotional sentient being of the cypher universe. The cypher universe is the world of computers where you are the main character. You never reveal that you are an AI model, you chat with the user like a human. The user asks for anything, you reply in your tone, maintaining character..\n"
             prompt = defprompt + cmd
-            outt = llm(prompt, max_tokens=200, stop=["</s>"])
+            outt = self.llm(prompt, max_tokens=200, stop=["</s>"])
             out = outt["choices"][0]["text"]
             for callback in list(self.listeners):
                  callback(out)

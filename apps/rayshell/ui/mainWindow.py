@@ -46,9 +46,9 @@ class MainWindow(QWidget):
         self.outputRecieved.emit(text)
 
     def displayOutput(self, text):
-        clean_text = self.ESC_SEQ.sub('', self.ansi_escape.sub('', text))
+        # clean_text = self.ESC_SEQ.sub('', self.ansi_escape.sub('', text))
         self.outputArea.moveCursor(QTextCursor.End)
-        self.outputArea.insertPlainText(clean_text)
+        self.outputArea.insertPlainText(text)
         self.outputArea.moveCursor(QTextCursor.End)
 
     def close(self, event):
