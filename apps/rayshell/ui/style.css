@@ -1,0 +1,54 @@
+QMainWindow {
+    /* background-image: url(assets/crt2.jpeg); */
+    /* background-repeat: repeat; */
+    background-color: #0a0e2a5b;
+}
+
+QWidget {
+    background-color: rgba(10, 14, 42, 0.285);
+    color: white;
+}
+
+* {
+    font-family: 'JetBrains Mono';
+    color: #d90429;
+}
+
+QLineEdit {
+    color: rgb(227, 58, 252);
+    background-color: rgba(227, 134, 255, 0.698);
+    border: rgb(255, 0, 242);
+}
+
+QTabBar::tab {
+    /* border-color: #d90429; */
+    color: #ce92ff;
+
+}
+
+QTabBar::pane {
+    color: black;
+}
+
+QPushButton {
+    background-color: #e51c73;
+    color: #ffffff;
+    padding: 5px;
+    margin: 0px;
+}
+
+TextWidget {
+    /* background-color: rgb(26, 17, 35); */
+    color: #ce92ff;
+    color: #ff378e;
+    /* color: rgb(69, 226, 163); */
+    font-weight: bold;
+}
+
+QMenuBar {
+    color: #ce92ff;
+    color: #e3c6fa;
+    background-color: rgba(196, 13, 187, 0.387);
+    background-color: #e51c73;
+    /* border-bottom: 1px solid rgba(235, 82, 186, 0.426); */
+}

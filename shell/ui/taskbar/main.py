@@ -106,7 +106,5 @@ def on_focus_changed(old, new):
 
 QApplication.instance().focusChanged.connect(on_focus_changed)
 
-
-
 main.show()
 app.exec_()
