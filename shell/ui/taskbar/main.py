@@ -28,14 +28,14 @@ layout = QGridLayout()
 screen = app.primaryScreen()
 geo = screen.geometry()
 screenheight = geo.height()
-bar = 30
+bar = 40
 
-main.setFixedSize(geo.width(), 30)
+main.setFixedSize(geo.width(), 35)
 main.move(0, 0)
 
-main.setStyleSheet("background-color: rgba(68, 64, 68, 0); border: 0px")
+main.setStyleSheet("background-color: transparent; border: 0px")
 
-font = QFont("Jetbrains mono", 10)
+font = QFont("OCR A", 10)
 # font.setBold(True)
 app.setFont(font)
 
@@ -60,7 +60,7 @@ centerLayout = QHBoxLayout()
 centerLayout.setContentsMargins(0,0,0,0)
 centerLayout.setSpacing(6)
 clock = ClockWidget()
-clock.setFixedHeight(25)
+clock.setFixedHeight(30)
 
 # clock.adjustSize()
 centerLayout.addWidget(clock)
@@ -81,19 +81,16 @@ battery = BatteryWidget()
 cpu = CpuWidget()
 # cpu.setMargin()
 battery.setFixedHeight(24)
-cpu.setFixedHeight(24)
+cpu.setFixedHeight(30)
 mem = MemWidget()
 mem.setFixedHeight(24)
 layout.addWidget(right, 0, 2, alignment=Qt.AlignRight)
 
-rightLayout.addWidget(mem)
+# rightLayout.addWidget(mem)
 
-rightLayout.addWidget(cpu)
+# rightLayout.addWidget(cpu)
 rightLayout.addWidget(battery)
 # layout.addStretch(1)
-
-
-
 
 main.setFocusPolicy(Qt.NoFocus)
 previousFocus = None

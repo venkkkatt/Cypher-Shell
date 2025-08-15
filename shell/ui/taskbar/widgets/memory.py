@@ -6,7 +6,7 @@ class MemWidget(QLabel):
     def __init__(self):
         super().__init__()
 
-        self.setStyleSheet("color:#ce92ff; padding : 0px 5px; border: 1px solid rgba(255, 156, 255, 0.273); border-radius: 0%;background-color: rgba(68, 64, 68, 0.256);")
+        self.setStyleSheet("color:#b7efc5; padding : 0px 5px; border: 1px solid #70e000; border-radius: 0%;background-color: #036666;")
         psutil.virtual_memory()
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh)
@@ -20,3 +20,4 @@ class MemWidget(QLabel):
         self.setText(f"MEM:{usage.percent:.0f}%")
 
 
+# ce92ff

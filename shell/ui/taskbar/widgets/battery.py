@@ -6,7 +6,7 @@ class BatteryWidget(QLabel):
     def __init__(self):
         super().__init__()
 
-        self.setStyleSheet("color:#ce92ff; padding : 0px 5px; border: 1px solid rgba(255, 156, 255, 0.273); border-radius: 1%;background-color: rgba(68, 64, 68, 0.256);")
+        self.setStyleSheet("color:#b7efc5; padding : 0px 5px; border: 1px solid #70e000; border-radius: 1%;background-color: #036666;")
 
         self.updateBattery()
 

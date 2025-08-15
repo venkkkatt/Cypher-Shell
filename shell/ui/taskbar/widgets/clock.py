@@ -6,7 +6,7 @@ class ClockWidget(QLabel):
         super().__init__()
         self.setMargin(5)
 
-        self.setStyleSheet("color:#ce92ff; padding : 0px 5px; border: 1px solid #90b388eb; border-radius:1%;  background-color: rgba(68, 64, 68, 0.256); font-size:13px")
+        self.setStyleSheet("color:#b7efc5; padding : 0px 5px; border: 1px solid #70e000; border-radius:1%;  background-color: #036666; font-size:13px")
 
         self.updateTime()
 

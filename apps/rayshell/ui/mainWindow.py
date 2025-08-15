@@ -1,10 +1,12 @@
-from PyQt5.QtCore import Qt, QProcess, pyqtSignal, QTimer
+from PyQt5.QtCore import Qt, QProcess, pyqtSignal, QTimer, QMetaObject, Q_ARG, pyqtSlot
 from PyQt5.QtGui import QFont, QTextCursor, QColor, QTextCharFormat, QMovie
-from PyQt5.QtWidgets import QWidget, QMainWindow ,QApplication ,QMenu, QMenuBar, QGraphicsDropShadowEffect, QGraphicsOpacityEffect, QLabel, QPushButton, QHBoxLayout, QVBoxLayout, QLineEdit, QTextEdit, QSizePolicy, QStackedWidget, QGridLayout, QTabBar, QTabWidget
-import sys,re,os, random
+from PyQt5.QtWidgets import QWidget, QMainWindow ,QApplication ,QMenu, QMenuBar, QGraphicsDropShadowEffect, QGraphicsOpacityEffect, QLabel, QPushButton, QHBoxLayout, QVBoxLayout, QLineEdit, QTextEdit, QSizePolicy, QStackedWidget, QGridLayout, QTabBar, QTabWidget, QMessageBox
+
+import sys,re,os, random, time
 # import apps.rayshell.ui.s
 from apps.rayshell.core.shell import RayShell
 from apps.storyEngine.engine import Main
+from apps.rayshell.core.terminal import Terminal
 
 class TerminalWindow(QWidget):
     def __init__(self):
@@ -57,13 +59,6 @@ class RayshellWindow(QWidget):
         self.glowEffect.setOffset(0,0)
         self.glowEffect.setBlurRadius(200)
 
-        self.loader = QLabel(self)
-        self.loaderMovie = QMovie("assets/loading-unscreen.gif")
-        # self.loader.setAlignment(Qt.AlignCenter)
-        self.loader.setFixedSize(24,24)
-        self.loader.setMovie(self.loaderMovie)
-        self.loader.setVisible(False)
-
         self.outputArea = TextWidget(self)
         # self.outputArea.setGraphicsEffect(self.glowEffect)
         self.outputArea.setFont(QFont("JetBrains Mono", 11))
@@ -79,8 +74,11 @@ class RayshellWindow(QWidget):
 
         self.shell = RayShell()
         self.engine = Main()
+        self.terminal = Terminal()
         self.shell.addListener(self.OnOutput)
         self.engine.addListener(self.OnOutput)
+        if self.mode == "terminal":
+            self.terminal.addListener(self.OnOutput)
         self.outputRecieved.connect(self.displayOutput)  
 
     def setMode(self, mode):
@@ -88,11 +86,16 @@ class RayshellWindow(QWidget):
         # if mode == "ray":
         #     self.outputArea()
 
+    def loading(pt):
+            for i in ['.','..','...']:
+                sys.stdout.write(f"\rLoading{i}   ")
+                sys.stdout.flush()
+                time.sleep(0.5) 
+
     def glitch(self):
         return random.choice(['█', '▓', '░', '#', '/', '\\', '|', '*', '-', '0', '1'])
     
     def typeW(self):
-        
         if self.idx < len(self.text):
             self.widget.moveCursor(QTextCursor.End)
             self.widget.insertPlainText(self.text[self.idx])
@@ -105,7 +108,6 @@ class RayshellWindow(QWidget):
                 self.addCallback()
                 
     def typeWriterEffect(self, widget, text, onFinished):
-
         self.text = text
         self.widget = widget
         self.idx = 0
@@ -122,20 +124,47 @@ class RayshellWindow(QWidget):
         self.effect1.setOpacity(random.uniform(0.85, 1.0))
 
     def handleInput(self, cmd):
-        self.loader.setVisible(True)
-        self.loaderMovie.start()
-        print("GIF valid:", self.loaderMovie.isValid())
+        self.outputArea.loader.setVisible(True)
+        self.outputArea.loaderMovie.start()
         if self.mode == "ray":
             self.engine.interCept(cmd)
-        else:
+        elif self.mode == "rayshell":
             self.shell.parseCmd(cmd)
+        else:
+            self.terminal.sendCmd(cmd)
+
+    def OnOutputTerminal(self, text):
+        self.outputRecieved.emit(text)
         
     def OnOutput(self,text):
-        self.outputRecieved.emit(text)
+        if text.startswith("__CONFIRM_COMMAND__::"):
+            bash_cmd = text.split("::", 1)[1]
+            QMetaObject.invokeMethod(
+                self,
+                "_showConfirmDialog",
+                Qt.QueuedConnection,
+                Q_ARG(str, bash_cmd)
+            )
+        else:
+            self.outputRecieved.emit(text)
 
+    @pyqtSlot(str)
+    def _showConfirmDialog(self, cmd):
+        reply = QMessageBox.question(
+            self,
+            "Execute command?",
+            f"RayShell suggests the following command:\n\n{cmd}\n\nExecute it?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            self.shell.sendCmd(cmd)
+        else:
+            self.displayOutput("Command execution aborted by user.\n")
+    
     def displayOutput(self, text):
-        self.loaderMovie.stop()
-        self.loader.setVisible(False)
+        self.outputArea.loaderMovie.stop()
+        self.outputArea.loader.setVisible(False)
         self.outputArea.moveCursor(QTextCursor.End)
         self.typeWriterEffect(self.outputArea, text, self.outputArea.addPrompt)
         # self.outputArea.insertPlainText('\n'+text)
@@ -165,15 +194,17 @@ class MainWindow(QMainWindow):
 
         self.RWS = RayshellWindow()
         self.RWE = RayshellWindow()
+        self.RWT = RayshellWindow()
         initialMsg = self.RWS.shell.initialMsg()
         self.RWS.displayOutput(initialMsg)
 
         self.tabBar.addTab(self.RWS, "RayShell")
         self.tabBar.addTab(self.RWE, "Ray")
-        self.tabBar.addTab(TerminalWindow(), "Terminal")
+        self.tabBar.addTab(self.RWT, "Terminal")
 
         self.RWS.setMode("rayshell")
         self.RWE.setMode("ray")
+        self.RWT.setMode("terminal")
 
         self.setWindowTitle("rayshell")
         self.menu = self.menuBar()
@@ -188,17 +219,16 @@ class MainWindow(QMainWindow):
         self.shell = RayShell()
         self.tabBar.currentChanged.connect(self.onTabChanged)
 
-
     def onTabChanged(self, idx):
         if idx == 0:
             self.currentMode = "rayshell"
-        else:
+        elif idx == 1:
             self.currentMode = "ray"
             initialMsg = self.RWE.engine.rayshell.initialMsg()
             if initialMsg:
                 self.RWE.displayOutput(initialMsg)
-
-
+        else:
+            self.currentMode = "terminal"
 
 class TextWidget(QTextEdit):
     def __init__(self, parent=None):
@@ -212,6 +242,20 @@ class TextWidget(QTextEdit):
         self.insertHtml(self.parent.styled(self.prompt))
         self.prompt_position = self.textCursor().position()
         self.setFocus()
+
+        self.loader = QLabel(self)
+        self.loader.setAlignment(Qt.AlignCenter)
+        self.loaderMovie = QMovie("/home/venkat/cypher-shell/assets/loading.gif")
+        self.loader.setMovie(self.loaderMovie)
+        self.loader.setVisible(False)
+        self.loader.setStyleSheet("background-color: transparent;")
+        self.loader.setFixedSize(64,64)
+        self.loader.move(
+            (self.viewport().width() - self.loader.width()) // 2,
+            (self.viewport().height() - self.loader.height()) // 2
+        )
+        self.loader.raise_()
+
 
     def keyPressEvent(self, event):
         cursor = self.textCursor()

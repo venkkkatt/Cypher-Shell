@@ -40,24 +40,24 @@ class WorkspaceLabel(QLabel):
             self.setText("●")
             self.setStyleSheet(
             """
-                color: #b388eb;
+                color: #b7efc5;
                 font-size:12px;
                 padding: 0px 10px;
                 margin: 0px;
                 background: transparent;
-                border-left: 1px solid #30b388eb;
+                border-left: 1px solid #111d1370;
             """
             )
 
         else: 
             self.setText("○")
             self.setStyleSheet("""
-                color: #b388eb;
+                color: #05668d;
                 font-size:12px;
                 padding: 0px 10px;
                 margin: 0px;
                 background: transparent;
-                border-left: 1px solid #30b388eb;
+                border-left: 1px solid #111d1370;
                 
                 
             """)
