@@ -1,8 +1,3 @@
-#quotes handling
-#escape handling
-#comments
-#
-
 from enum import Enum
 
 class TokenType(Enum):
@@ -24,6 +19,7 @@ class TokenType(Enum):
     
 
 OPERATORS = {
+    ";":TokenType.SEMICOLON,
     "=": TokenType.EQ,
     "|": TokenType.PIPE,
     "||": TokenType.OR,

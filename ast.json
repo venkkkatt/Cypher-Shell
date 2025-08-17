@@ -1,0 +1,7 @@
+{
+    "type": "COMMAND",
+    "name": "echo",
+    "args": [
+        "hi"
+    ]
+}

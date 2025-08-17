@@ -1,0 +1,41 @@
+{
+    "type": "BINARYOP",
+    "op": "||",
+    "left": {
+        "type": "BINARYOP",
+        "op": "&&",
+        "left": {
+            "type": "PIPELINE",
+            "cmds": [
+                {
+                    "type": "COMMAND",
+                    "name": "cat",
+                    "args": [
+                        "file.txt"
+                    ]
+                },
+                {
+                    "type": "COMMAND",
+                    "name": "grep",
+                    "args": [
+                        "error"
+                    ]
+                }
+            ]
+        },
+        "right": {
+            "type": "COMMAND",
+            "name": "echo",
+            "args": [
+                "Errors found"
+            ]
+        }
+    },
+    "right": {
+        "type": "COMMAND",
+        "name": "echo",
+        "args": [
+            "No errors"
+        ]
+    }
+}
