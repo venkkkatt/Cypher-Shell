@@ -49,26 +49,51 @@ class Parser:
     def parseCommand(self):
         token = self.advance()
         if token.type not in (TokenType.WORD, TokenType.STRING):
-            raise ValueError("The first word should be a command")
+            return ("The first word should be a command")
         
         cmd = token.value
         args = []
 
+        redir = {
+            "stdin": None,
+            "stdout": None,
+            "stderr": None,
+            "stdoutAppend": False,
+            "stderrAppend": False
+        }
+
         while self.peek().type in (TokenType.WORD, TokenType.STRING):
             args.append(self.advance().value)
-
-        # while True:
-        #     token = self.peek()
-        #     if token.type in (TokenType.EOF,):
-        #         break
-        #     elif token.type in (TokenType.REDIR_IN, TokenType.REDIR_OUT):
-        #         break
-        #     else:
-        #         args.append(self.advance().value)
         
-        return CommandNode(name = cmd, args = args)
-
-
-
-
+        while self.peek().type in (TokenType.REDIR_IN, TokenType.REDIR_OUT, TokenType.REDIR_ERR, TokenType.APPEND_OUT, TokenType.APPEND_ERR):
+            self.parseRedirection(redir)
         
+        return CommandNode(name = cmd, 
+                        args = args, stdin=redir['stdin'],
+                        stdout=redir['stdout'],
+                        stdoutAppend=redir['stdoutAppend'],
+                        stderr=redir['stderr'],
+                        stderrAppend=redir['stderrAppend'])
+    
+    def parseRedirection(self, redir):
+        tok = self.advance()
+        if self.peek().type not in (TokenType.WORD, TokenType.STRING):
+            raise ValueError ("File name required after redirection!")
+        
+        target = self.advance()
+        
+        match tok.type:
+            case TokenType.REDIR_IN:
+                redir['stdin'] = target.value
+            case TokenType.REDIR_OUT:
+                redir['stdout'] = target.value
+            case TokenType.APPEND_OUT:
+                redir['stdout'] = target.value
+                redir['stdoutAppend'] = True
+            case TokenType.REDIR_ERR:
+                redir['stderr'] = target.value
+            case TokenType.APPEND_ERR:
+                redir['stderr'] = target.value
+                redir['stderrAppend'] = True
+            case _:
+                raise SyntaxError("No such Redirection type!")        

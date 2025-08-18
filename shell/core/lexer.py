@@ -12,11 +12,12 @@ class TokenType(Enum):
     APPEND_OUT = "APPEND_OUT"
     REDIR_OUT = "REDIR_OUT"
     REDIR_IN = "REDIR_IN"
+    REDIR_ERR = "REDIR_ERR"
+    APPEND_ERR = "APPEND_ERR"
     HERE_DOC = "HERE_DOC"
     HERE_STRING = "HERE_STRING"
     RESERVED = "RESERVED"
     EOF = "EOF"
-    
 
 OPERATORS = {
     ";":TokenType.SEMICOLON,
@@ -27,6 +28,8 @@ OPERATORS = {
     "&&" : TokenType.AND,
     ">" : TokenType.REDIR_OUT,
     ">>" : TokenType.APPEND_OUT,
+    "2>" : TokenType.REDIR_ERR,
+    "2>>" : TokenType.APPEND_ERR,
     "<" : TokenType.REDIR_IN,
     "<<" : TokenType.HERE_DOC,
     "<<<" : TokenType.HERE_STRING,

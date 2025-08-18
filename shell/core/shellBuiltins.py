@@ -1,7 +1,7 @@
 import os
 
 BUILTINS = {
-    "cd", "pwd", "echo", "jump", "cwd", "disp", "print"
+    "cd", "pwd", "echo", "jump", "cwd", "disp", "print", "hi"
 }
 
 class BuiltinFns:
@@ -17,6 +17,8 @@ class BuiltinFns:
             return self.handle_pwd()
         if self.cmd in ("echo","print","disp"):
             return self.handle_echo()
+        if self.cmd == "hi":
+            return self.handle_hi()
         return 0
         
     def handle_cd(self):
@@ -29,12 +31,17 @@ class BuiltinFns:
         except Exception as e:
             print(f"cd: {e}")
             return 1
+        
+    def handle_hi(self):
+        print("hey, I don't talk much. I just execute commands.")
+        return 0
 
     def handle_pwd(self):
         print(os.getcwd())
         return 0
 
-    def handle_echo(self):
-        print(" ".join(self.args))
+    def handle_echo(self, stdout = 1):
+        os.write(stdout, (" ".join(self.args) + "\n").encode())
+        # print(" ".join(self.args))
         return 0
         

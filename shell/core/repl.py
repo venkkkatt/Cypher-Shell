@@ -2,7 +2,7 @@ from lexer import Lexer
 from parser import Parser
 from executor import Executor
 from ast import saveASTtoJson
-import os
+import os, readline
 
 LEXER:bool = True
 PARSER:bool = True

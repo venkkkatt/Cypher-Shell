@@ -22,10 +22,26 @@ class Executor:
         args = node.args
 
         if cmd in BUILTINS:
-            out = BuiltinFns(cmd, args).main()
-            return out if out is not None else 0
+            if node.stdin or node.stdout or node.stderr:
+                self.runBuiltinWithRedir(node)
+            else:
+                out = BuiltinFns(cmd, args).main()
+                return out if out is not None else 0
         else:
-            return self.runExternal(cmd, args)
+            return self.runExternal(node, cmd, args)
+        
+    def runBuiltinWithRedir(self, node):
+        origStdout = os.dup(1)
+        origStderr = os.dup(2)
+
+        try:
+            self.applyRedirections(node)
+            return BuiltinFns(node.name, node.args).main()
+        finally:
+            os.dup2(origStdout, 1)
+            os.dup2(origStderr, 2)
+            os.close(origStdout)
+            os.close(origStderr)
         
     def runBinary(self, node):
         leftStatus = self.run(node.left)
@@ -42,11 +58,12 @@ class Executor:
         else:
             raise ValueError("Expecting a binary operator")
         
-    def runExternal(self, cmd, args):
+    def runExternal(self, node, cmd, args):
         
         pid = libc.fork()
         if pid == 0:
             try:
+                self.applyRedirections(node)
                 argv = self.prepareArgv(cmd, args)
                 libc.execvp(ctypes.c_char_p(cmd.encode()), argv)
             except FileNotFoundError:
@@ -54,6 +71,8 @@ class Executor:
             except Exception as e:
                 print(f"{cmd}: {e}")
                 os._exit(1)
+            print("type in a real command!")
+            os._exit(127)
         else:
             status = ctypes.c_int()
             libc.waitpid(pid, ctypes.byref(status), 0)
@@ -75,7 +94,9 @@ class Executor:
                 if i > 0:
                     os.dup2(fds[i-1][0], 0)
                 if i < (n - 1):
-                    os.dup2(fds[i][1], 1)            
+                    os.dup2(fds[i][1], 1)      
+
+                self.applyRedirections(cmdNode)
             
                 for j, (rFd, wFd) in enumerate(fds):
                     if i-1 != j:
@@ -108,4 +129,22 @@ class Executor:
         arrayType = ctypes.c_char_p * (argc + 1)
         cArgv = arrayType(*[ctypes.cast(arg, ctypes.c_char_p) for arg in argv], None)
         return cArgv
+    
+    def applyRedirections(self, node):
+        if node.stdin:
+            fd = os.open(node.stdin, os.O_RDONLY)
+            os.dup2(fd, 0)
+            os.close(fd)
+        
+        if node.stdout:
+            flags = os.O_WRONLY | os.O_CREAT | (os.O_APPEND if node.stdoutAppend else os.O_TRUNC)
+            fd = os.open(node.stdout, flags, 0o644)
+            os.dup2(fd, 1)
+            os.close(fd)
+
+        if node.stderr:
+            flags = os.O_WRONLY | os.O_CREAT | (os.O_APPEND if node.stderrAppend else os.O_TRUNC)
+            fd = os.open(node.stderr, flags, 0o644)
+            os.dup2(fd, 2)
+            os.close(fd)
     

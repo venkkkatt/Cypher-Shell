@@ -6,7 +6,6 @@ class ASTNodeType(Enum):
     PIPELINE = "PIPELINE"
     BINARYOP = "BINARYOP"
     ASSIGNMENT = "ASSIGNMENT"
-    REDIRECTION = "REDIRECTION"
     SUBSHELL = "SUBSHELL"
     IFNODE = "IFNODE"
     FORNODE = "FORNODE"
@@ -18,18 +17,30 @@ class ASTNode:
         self.__dict__.update(kwargs)
     def __repr__(self):
         return (f"{self.type}: {self.__dict__}")
-    
-class CommandNode(ASTNode):
-    def __init__(self, name, args):
-        super().__init__(ASTNodeType.COMMAND, name=name, args=args)
-    def __repr__(self):
-        return f"CommandNode(name = '{self.name}', args = {self.args})"
+        
     def toDict(self):
-        return {
-            "type" : self.type.value,
-            "name" : self.name,
-            "args" : self.args
-        }
+        result = {}
+        for k, v in self.__dict__.items():
+            if k.startswith("_"):
+                continue
+            if isinstance(v, ASTNode):
+                result[k] = v.toDict()
+            elif isinstance(v, list):
+                result[k] = [item.toDict() if isinstance(item, ASTNode) else item for item in v]
+            elif isinstance(v, Enum):
+                result[k] = v.value
+            else:
+                result[k] = v
+        return result
+
+class CommandNode(ASTNode):
+    def __init__(self, name, args, stdin=None, stdout=None, stdoutAppend=False, stderr=None, stderrAppend=False):
+        super().__init__(ASTNodeType.COMMAND, name=name, args=args)
+        self.stdin = stdin
+        self.stdout = stdout
+        self.stdoutAppend = stdoutAppend
+        self.stderr = stderr
+        self.stderrAppend = stderrAppend
 
 class BinaryOpNode(ASTNode):
     def __init__(self, op, left, right):
@@ -37,25 +48,12 @@ class BinaryOpNode(ASTNode):
     
     def __repr__(self):
         return f"BinaryOpNode(op = '{self.op}', left = {self.left}, right = {self.right})"
-    
-    def toDict(self):
-        return {
-            "type" : self.type.value,
-            "op" : self.op,
-            "left" : self.left.toDict(),
-            "right" : self.right.toDict()
-        }
 
 class PipeLineNode(ASTNode):
     def __init__(self, name, cmds):
         super().__init__(ASTNodeType.PIPELINE, name=name, cmds=cmds)
     def __repr__(self):
         return f"PipeLineNode(cmds = {self.cmds})"
-    def toDict(self):
-        return {
-            "type" : self.type.value,
-            "cmds" : [cmd.toDict() for cmd in self.cmds]
-        }
 
 def saveASTtoJson(node, filename = "ast.json"):
     with open (filename, "w") as f:
