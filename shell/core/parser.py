@@ -1,6 +1,6 @@
 from lexer import Lexer, TokenType, Token
 from enum import Enum
-from ast import CommandNode, PipeLineNode, BinaryOpNode
+from ast import CommandNode, PipeLineNode, BinaryOpNode, AssignmentNode, AssignmentListNode
     
 class Parser:
     def __init__(self, tokens):
@@ -11,11 +11,32 @@ class Parser:
         if self.pos < len(self.tokens):
             return self.tokens[self.pos]
         return Token(TokenType.EOF, None)
+    
+    def peekN(self, n:int):
+        idx = self.pos + n
+        if 0 <= idx < len(self.tokens):
+            return self.tokens[idx]
+        return Token(TokenType.EOF, None)
         
     def advance(self):
         tok = self.peek()
         self.pos += 1
         return tok
+    
+    def isAssignmentLookAhead(self) -> bool:
+        return (self.peek().type == TokenType.WORD and self.peekN(1).type == TokenType.EQ)
+    
+    def isCommandStart(self, tok) -> bool:
+        return tok.type in (TokenType.WORD, TokenType.STRING)
+    
+    def isRedirection(self, tok) -> bool:
+        return tok.type in (
+            TokenType.REDIR_IN,
+            TokenType.REDIR_OUT,
+            TokenType.REDIR_ERR,
+            TokenType.APPEND_OUT,
+            TokenType.APPEND_ERR,
+        )
     
     def parse(self):
         return self.parseSequence()
@@ -46,13 +67,25 @@ class Parser:
             return node
         return PipeLineNode("PIPELINE", cmds)    
     
+    def parseAssignment(self):
+        varName = self.advance().value
+        self.advance()
+        if self.peek().type in (TokenType.WORD, TokenType.STRING):
+            varValue = self.advance().value
+        else:
+            varValue = None
+        return AssignmentNode(varName, varValue)
+
     def parseCommand(self):
-        token = self.advance()
-        if token.type not in (TokenType.WORD, TokenType.STRING):
-            return ("The first word should be a command")
-        
-        cmd = token.value
-        args = []
+        assignments = []
+        while self.isAssignmentLookAhead():
+            assignment = self.parseAssignment()
+            assignments.append(assignment)
+
+        if assignments and not (self.isCommandStart(self.peek()) or self.isRedirection(self.peek())):
+            if len(assignments) == 1:
+                return assignments[0]
+            return AssignmentListNode(assignments)
 
         redir = {
             "stdin": None,
@@ -62,18 +95,30 @@ class Parser:
             "stderrAppend": False
         }
 
-        while self.peek().type in (TokenType.WORD, TokenType.STRING):
-            args.append(self.advance().value)
-        
-        while self.peek().type in (TokenType.REDIR_IN, TokenType.REDIR_OUT, TokenType.REDIR_ERR, TokenType.APPEND_OUT, TokenType.APPEND_ERR):
+        while self.isRedirection(self.peek()):
             self.parseRedirection(redir)
+        
+        cmd = None
+        args = []
+
+        if self.isCommandStart(self.peek()):
+            cmd = self.advance().value
+            while self.isCommandStart(self.peek()):
+                args.append(self.advance().value)
+
+        while self.isRedirection(self.peek()):
+            self.parseRedirection(redir)
+
+        if not cmd and not assignments and not any (redir.values()):
+            raise SyntaxError("Empty command!")
         
         return CommandNode(name = cmd, 
                         args = args, stdin=redir['stdin'],
                         stdout=redir['stdout'],
                         stdoutAppend=redir['stdoutAppend'],
                         stderr=redir['stderr'],
-                        stderrAppend=redir['stderrAppend'])
+                        stderrAppend=redir['stderrAppend'],
+                        assignments=assignments)
     
     def parseRedirection(self, redir):
         tok = self.advance()

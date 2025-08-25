@@ -1,12 +1,11 @@
 {
     "type": "COMMAND",
-    "name": "echo",
-    "args": [
-        "hihih"
-    ],
+    "name": null,
+    "args": [],
     "stdin": null,
-    "stdout": "file.txt",
+    "stdout": "out",
     "stdoutAppend": false,
     "stderr": null,
-    "stderrAppend": false
+    "stderrAppend": false,
+    "assignments": []
 }

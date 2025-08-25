@@ -1,13 +1,13 @@
 import pty, os, threading, select, signal, pyte
 
 class Terminal:
-    def __init__(self, shellPath = "/bin/bash"):
+    def __init__(self, shellPath = "/home/venkat/rayshell/core/repl.py"):
         self.pid, self.masterfd =  pty.fork()
         self.listeners = []
         self.alive = True
 
         if self.pid == 0:
-            os.execvp(shellPath, [shellPath])
+            os.execvp("python3", ["python3", shellPath])
 
         self.thread = threading.Thread(target=self.readFromPty, daemon=True)
         self.thread.start()
@@ -34,7 +34,7 @@ class Terminal:
     
     def sendCmd(self, cmd):
         if self.masterfd and self.alive:
-            os.write(self.masterfd, cmd.encode())
+            os.write(self.masterfd, (cmd).encode())
     
     def addListener(self, callback):
         self.listeners.append(callback)
