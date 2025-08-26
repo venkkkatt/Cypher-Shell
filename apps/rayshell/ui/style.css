@@ -1,28 +1,54 @@
 QMainWindow {
     /* background-image: url(assets/crt2.jpeg); */
     /* background-repeat: repeat; */
-    background-color: #0a0e2a5b;
+    /* background-color: #fff; */
+        background-color: rgba(14, 11, 3, 0.939);
+            background-color: rgb(16, 14, 10);
+
+
+    color: #000;
 }
 
 QWidget {
-    background-color: rgba(10, 14, 42, 0.285);
+    /* background-color: white; */
+    background-color: rgb(11, 16, 10);
+        background-color: rgb(16, 14, 10);
+
+
     color: white;
 }
 
 * {
-    font-family: 'JetBrains Mono';
-    color: #d90429;
+    font-family: 'VT323';
+    color: #d99d04;
 }
+
+QTextEdit {
+    background-color: rgb(11, 16, 10);
+    border: none;
+}
+
+/* style.qss */
+QTextEdit#outputArea {
+    background-color: rgb(11, 16, 10);
+    background-color: rgb(16, 14, 10);
+    border: none;
+}
+
+QTextEdit#outputArea QWidget {
+    background-color: rgb(11, 16, 10);
+}
+
 
 QLineEdit {
     color: rgb(227, 58, 252);
-    background-color: rgba(62, 225, 13, 0.698);
+    background-color: rgb(100, 65, 0);
     border: rgb(255, 0, 242);
 }
 
 QTabBar::tab {
     /* border-color: #d90429; */
-    color: #ce92ff;
+    color: #e4e4e4;
 
 }
 
@@ -30,25 +56,48 @@ QTabBar::pane {
     color: black;
 }
 
+QTabWidget::pane {
+    background-color: rgba(255, 176, 57, 0.362);
+    /* background-color: #021500; */
+}
+QTabBar::tab {
+    background-color: rgba(74, 74, 87, 0.06);
+    color: #ffb923;
+    font-size: 16px;
+    width: 70px;
+    padding: 5px 15px;
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+}
+QTabBar::tab:selected {
+    background-color: rgba(245, 177, 18, 0.607);
+    /* background-color: rgba(135, 245, 18, 0.607); */
+        /* background-color: rgba(33, 33, 33, 0.833); */
+
+    color: #000;
+}
+
 QPushButton {
-    background-color: #e51c73;
-    color: #ffffff;
+    background-color: #e5a91c;
+    color: #13140f;
     padding: 5px;
     margin: 0px;
 }
 
 TextWidget {
     /* background-color: rgb(26, 17, 35); */
-    color: #ce92ff;
-    color: #ff378e;
+    color: #c58634;
+    /* color: #2add1d; */
+    font-size: 25px;
     /* color: rgb(69, 226, 163); */
-    font-weight: bold;
 }
 
 QMenuBar {
     color: #ce92ff;
     color: #e3c6fa;
+    font-size: 18px;
+
     background-color: rgba(196, 13, 187, 0.387);
-    background-color: #e51c73;
+    background-color: #ce92ff;
     /* border-bottom: 1px solid rgba(235, 82, 186, 0.426); */
 }

@@ -1,4 +1,3 @@
 file.txt
-core/ast.json
-**/__pycache__/
+**/__pycache__
 *.py[cod]

@@ -1,5 +1,5 @@
 from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QTimer, QMetaObject, Q_ARG
-from PyQt5.QtGui import QFont, QTextCursor, QColor
+from PyQt5.QtGui import QFont, QTextCursor, QColor, QPainter
 from PyQt5.QtWidgets import (
     QWidget, QMainWindow, QApplication, QVBoxLayout, QLabel, QTextEdit,
     QTabWidget, QSizePolicy, QHBoxLayout, QPushButton, QGraphicsDropShadowEffect,
@@ -10,18 +10,53 @@ from apps.storyEngine.engine import Main
 from apps.rayshell.core.terminal import Terminal
 import os, re
 
+class CRTOverlay(QWidget):
+    def __init__(self, parent=None, line_spacing=5):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WA_NoSystemBackground)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.line_spacing = line_spacing
+        self.scanlineOffset = 0
+
+        self.scanlineTimer = QTimer()
+        self.scanlineTimer.timeout.connect(self.updateScanline)
+        self.scanlineTimer.start(100)
+
+    def updateScanline(self):
+        self.scanlineOffset = (self.scanlineOffset + 1) % self.line_spacing
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setPen(QColor(51, 53, 51, 20))
+        for y in range(-self.scanlineOffset, self.height(), self.line_spacing):
+            painter.drawLine(0, y, self.width(), y)
+        painter.end()
+
 class TextWidget(QTextEdit):
     commandEntered = pyqtSignal(str)
 
     def __init__(self, prompt="", parent=None):
         super().__init__(parent)
         self.prompt = prompt
-        self.setFont(QFont("JetBrains Mono", 11))
+        self.setFont(QFont("VT323", 10))
+
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.setUndoRedoEnabled(False)
-        self.setWordWrapMode(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setWordWrapMode(True)
+
+        self.crtOverlay = CRTOverlay(self)
+        self.crtOverlay.resize(self.size())
+        self.installEventFilter(self)
+
+        glow = QGraphicsDropShadowEffect()
+        glow.setColor(QColor(00, 25, 0)) 
+        glow.setOffset(0,0)
+        glow.setBlurRadius(4)
+        self.setGraphicsEffect(glow)
 
         self.loaderStates = [".", "..", "..."]
         self.loaderIndex = 0
@@ -30,7 +65,11 @@ class TextWidget(QTextEdit):
 
         self.loaderTimer = QTimer()
         self.loaderTimer.timeout.connect(self.updateLoader)
-        # self.insertPrompt()
+
+    def eventFilter(self, source, event):
+        if source == self and event.type() == event.Resize:
+            self.crtOverlay.resize(self.size())
+        return super().eventFilter(source, event)
 
     def insertPrompt(self):
         self.append(self.prompt)
@@ -60,24 +99,19 @@ class TextWidget(QTextEdit):
     def updateLoader(self):
         if not self.loaderActive or self.loader_block_number is None:
             return
-
         cursor = QTextCursor(self.document().findBlockByNumber(self.loader_block_number))
         cursor.movePosition(QTextCursor.StartOfBlock)
         cursor.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
         cursor.removeSelectedText()
         cursor.insertText(self.loaderStates[self.loaderIndex])
-        
         self.loaderIndex = (self.loaderIndex + 1) % len(self.loaderStates)
-
         self.moveCursor(QTextCursor.End)
 
     def keyPressEvent(self, event):
         cursor = self.textCursor()
-        
         if cursor.blockNumber() < self.prompt_block.blockNumber():
             cursor.movePosition(QTextCursor.End)
             self.setTextCursor(cursor)
-
         if event.key() == Qt.Key_Return:
             cursor.movePosition(QTextCursor.End)
             self.setTextCursor(cursor)
@@ -86,11 +120,9 @@ class TextWidget(QTextEdit):
                 self.commandEntered.emit(user_input)
                 self.setReadOnly(True)
             return
-
         elif event.key() == Qt.Key_Backspace:
             if cursor.position() <= self.prompt_block.position() + len(self.prompt):
                 return
-
         super().keyPressEvent(event)
 
 class ShellWindow(QWidget):
@@ -99,7 +131,9 @@ class ShellWindow(QWidget):
     def __init__(self,shell,parent=None):
         super().__init__(parent)
         self.shell=shell
-        self.outputArea = TextWidget(parent=self)
+        self.outputArea = TextWidget(prompt=">>> ", parent=self)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setWindowFlags(Qt.FramelessWindowHint)
         self.outputArea.commandEntered.connect(self.handleInput)
         layout=QVBoxLayout()
         layout.addWidget(self.outputArea)
@@ -140,7 +174,7 @@ class ShellWindow(QWidget):
     @pyqtSlot(str)
     def displayOutput(self,text):
         self.outputArea.stopLoader()
-        self.outputArea.append(text)
+        self.outputArea.append(text + "\n")
         self.outputArea.insertPrompt()
 
 class TerminalWindow(QWidget):
@@ -149,6 +183,8 @@ class TerminalWindow(QWidget):
     def __init__(self,terminal,parent=None):
         super().__init__(parent)
         self.terminal=terminal
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setWindowFlags(Qt.FramelessWindowHint)
         self.outputArea=TextWidget(parent=self)
         self.outputArea.commandEntered.connect(self.handleInput)
         layout=QVBoxLayout()
@@ -156,7 +192,7 @@ class TerminalWindow(QWidget):
         self.setLayout(layout)
         self.terminal.addListener(self.receiveOutput)
         self.outputReceived.connect(self.displayOutput)
-        
+
     def clean_ansi(self, text):
         ansi_escape = re.compile(r'\x1B[@-_][0-?]*[ -/]*[@-~]')
         return ansi_escape.sub('', text)
@@ -166,14 +202,14 @@ class TerminalWindow(QWidget):
         self.terminal.sendCmd(cmd+'\n')
 
     def receiveOutput(self,text):
-        if text.strip() == getattr(self, "_lastCmd", None):
+        if text.rstrip() == getattr(self, "_lastCmd", None):
             return
         self.outputReceived.emit(text)
-
+        
     @pyqtSlot(str)
     def displayOutput(self,text):
         text = self.clean_ansi(text)
-        # text = text.rstrip("\n") 
+        text = text.rstrip("\n") 
         self.outputArea.insertPlainText(text)
         self.outputArea.insertPrompt()
 
@@ -181,11 +217,10 @@ class CustomTitleBar(QWidget):
     def __init__(self,parent=None):
         super().__init__(parent)
         self.setFixedHeight(30)
-        # self.setStyleSheet("background-color:#1e1e1e;")
         layout=QHBoxLayout()
         layout.setContentsMargins(10,0,10,0)
         self.titleLabel=QLabel("RayShell 1.01")
-        self.titleLabel.setFont(QFont("JetBrains Mono",11))
+        self.titleLabel.setFont(QFont("VT323"))
         self.titleLabel.setStyleSheet("color:#ce92ff;")
         glow = QGraphicsDropShadowEffect()
         glow.setColor(QColor(255,13,186))
@@ -210,24 +245,38 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowFlags(Qt.FramelessWindowHint)
         mainWidget=QWidget()
+        # self.crtOverlay = CRTOverlay(mainWidget)
+        # self.crtOverlay.resize(mainWidget.size())
+        # self.crtOverlay.lower()
+        # self.installEventFilter(self)
+
+        mainWidget.setAttribute(Qt.WA_TranslucentBackground, True)
         mainLayout=QVBoxLayout()
         mainLayout.setContentsMargins(0,0,0,0)
         mainLayout.setSpacing(0)
-        self.titleBar=CustomTitleBar(self)
-        mainLayout.addWidget(self.titleBar)
+        self.setWindowTitle("rayshell")
         self.tabBar=QTabWidget()
         self.rayShellWindow=ShellWindow(RayShell())
         self.terminalWindow=TerminalWindow(Terminal())
         self.tabBar.addTab(self.rayShellWindow,"RayShell")
         self.tabBar.addTab(self.terminalWindow,"Terminal")
+        self.rayShellWindow.outputArea.setObjectName("outputArea")
+        self.terminalWindow.outputArea.setObjectName("outputArea")
         mainLayout.addWidget(self.tabBar)
         mainWidget.setLayout(mainLayout)
         self.setCentralWidget(mainWidget)
+        mainWidget.setAttribute(Qt.WA_TranslucentBackground, True)
+        
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, 'crtOverlay'):
+            self.crtOverlay.resize(self.centralWidget().size())
 
     def mousePressEvent(self,event):
         if event.button()==Qt.LeftButton:
             self.dragPos=event.globalPos()
-
+            
     def mouseMoveEvent(self,event):
         if event.buttons()==Qt.LeftButton:
             self.move(self.pos()+event.globalPos()-self.dragPos)
