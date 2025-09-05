@@ -3,9 +3,9 @@
 import os,sys
 os.environ.setdefault("QT_QPA_PLATFORM", "wayland") 
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import QApplication, QWidget,QGridLayout, QSizePolicy, QLabel, QPushButton, QHBoxLayout
-from PyQt5.QtGui import QFont, QPixmap, QIcon
+from PyQt5.QtGui import QFont
 from widgets.clock import ClockWidget
 from widgets.battery import BatteryWidget
 from widgets.workspaces import WorkspaceWidget
@@ -94,6 +94,15 @@ rightLayout.addWidget(battery)
 
 main.setFocusPolicy(Qt.NoFocus)
 previousFocus = None
+
+def updateAll():
+    battery.updateBattery()
+    clock.updateTime()
+
+
+timer = QTimer()
+timer.timeout.connect(updateAll)
+timer.start(1000)
 
 def on_focus_changed(old, new):
     global previous_focus

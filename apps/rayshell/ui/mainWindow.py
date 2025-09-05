@@ -37,10 +37,11 @@ class CRTOverlay(QWidget):
 class TextWidget(QTextEdit):
     commandEntered = pyqtSignal(str)
 
-    def __init__(self, prompt="", parent=None):
+    def __init__(self, prompt="", parent=None, terminal="", font="", size=10):
         super().__init__(parent)
         self.prompt = prompt
-        self.setFont(QFont("VT323", 10))
+        self.setFont(QFont(font, size))
+        self.terminal = terminal
 
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.setUndoRedoEnabled(False)
@@ -109,9 +110,33 @@ class TextWidget(QTextEdit):
 
     def keyPressEvent(self, event):
         cursor = self.textCursor()
+
         if cursor.blockNumber() < self.prompt_block.blockNumber():
             cursor.movePosition(QTextCursor.End)
             self.setTextCursor(cursor)
+
+        if event.key() == Qt.Key_C and event.modifiers() == Qt.ControlModifier:
+            if hasattr(self, "terminal") and self.terminal:
+                os.write(self.terminal.masterfd, b'\x03')
+            else:
+                # return
+                self.commandEntered.emit("__LLM_INTERRUPT__")
+
+        elif event.key() == Qt.Key_Z and event.modifiers() == Qt.ControlModifier:
+            if hasattr(self, "terminal") and self.terminal:
+                os.write(self.terminal.masterfd, b'\x1A')
+            else:
+                # return
+                self.commandEntered.emit("__LLM_PAUSE__")
+
+        # if event.key() == Qt.Key_C and event.modifiers() & Qt.ControlModifier:
+        #     self.commandEntered.emit("__SIGINT__")
+        #     return
+
+        # if event.key() == Qt.Key_Z and event.modifiers() & Qt.ControlModifier:
+        #     self.commandEntered.emit("__SIGTSTP__")
+        #     return
+    
         if event.key() == Qt.Key_Return:
             cursor.movePosition(QTextCursor.End)
             self.setTextCursor(cursor)
@@ -131,7 +156,7 @@ class ShellWindow(QWidget):
     def __init__(self,shell,parent=None):
         super().__init__(parent)
         self.shell=shell
-        self.outputArea = TextWidget(prompt=">>> ", parent=self)
+        self.outputArea = TextWidget(prompt=">>> ", parent=self, font="JetBrains Mono", size=11)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setWindowFlags(Qt.FramelessWindowHint)
         self.outputArea.commandEntered.connect(self.handleInput)
@@ -146,6 +171,9 @@ class ShellWindow(QWidget):
 
     def handleInput(self,cmd):
         self.outputArea.startLoader()
+        if cmd in ("__LLM_INTERRUPT__", "__LLM_PAUSE__"):
+            self.shell.interruptLLM()
+            # self.outputReceived.emit("HAHAH")
         self.shell.parseCmd(cmd)
 
     def receiveOutput(self,text):
@@ -174,7 +202,15 @@ class ShellWindow(QWidget):
     @pyqtSlot(str)
     def displayOutput(self,text):
         self.outputArea.stopLoader()
-        self.outputArea.append(text + "\n")
+        if text.strip().startswith("[SHELL]"):
+            styled = f'\n<span style="color:#c58634;">{text}</span>'
+        elif text.startswith("OUTPUT:"):
+            styled = f'\n<span style="color:#fff6cc;">{text}<br></span>'
+        elif "error" in text.lower():
+            styled = f'\n<span style="color:#fff6cc;">{text}</span>'
+        else:
+            styled = f'\n<span style="color:#fff6cc;">{text}</span>'
+        self.outputArea.append(styled)
         self.outputArea.insertPrompt()
 
 class TerminalWindow(QWidget):
@@ -185,7 +221,8 @@ class TerminalWindow(QWidget):
         self.terminal=terminal
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setWindowFlags(Qt.FramelessWindowHint)
-        self.outputArea=TextWidget(parent=self)
+        self.outputArea=TextWidget(parent=self, terminal = self.terminal, font="VT323", size=18)
+        self.outputArea.setStyleSheet("font-size: 25px")
         self.outputArea.commandEntered.connect(self.handleInput)
         layout=QVBoxLayout()
         layout.addWidget(self.outputArea)
@@ -213,33 +250,6 @@ class TerminalWindow(QWidget):
         self.outputArea.insertPlainText(text)
         self.outputArea.insertPrompt()
 
-class CustomTitleBar(QWidget):
-    def __init__(self,parent=None):
-        super().__init__(parent)
-        self.setFixedHeight(30)
-        layout=QHBoxLayout()
-        layout.setContentsMargins(10,0,10,0)
-        self.titleLabel=QLabel("RayShell 1.01")
-        self.titleLabel.setFont(QFont("VT323"))
-        self.titleLabel.setStyleSheet("color:#ce92ff;")
-        glow = QGraphicsDropShadowEffect()
-        glow.setColor(QColor(255,13,186))
-        glow.setOffset(0,0)
-        glow.setBlurRadius(15)
-        self.titleLabel.setGraphicsEffect(glow)
-        layout.addWidget(self.titleLabel)
-        layout.addStretch()
-        self.btnMin = QPushButton("-")
-        self.btnClose = QPushButton("x")
-        for btn in [self.btnMin,self.btnClose]:
-            btn.setFixedSize(30,30)
-            btn.setStyleSheet("color:#ce92ff;background-color:transparent;border:none;")
-        self.btnClose.clicked.connect(parent.close)
-        self.btnMin.clicked.connect(parent.showMinimized)
-        layout.addWidget(self.btnMin)
-        layout.addWidget(self.btnClose)
-        self.setLayout(layout)
-
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -266,7 +276,6 @@ class MainWindow(QMainWindow):
         mainWidget.setLayout(mainLayout)
         self.setCentralWidget(mainWidget)
         mainWidget.setAttribute(Qt.WA_TranslucentBackground, True)
-        
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

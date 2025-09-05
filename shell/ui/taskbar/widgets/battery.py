@@ -10,9 +10,9 @@ class BatteryWidget(QLabel):
 
         self.updateBattery()
 
-        timer = QTimer(self)
-        timer.timeout.connect(self.updateBattery)
-        timer.start(1000)
+        # timer = QTimer(self)
+        # timer.timeout.connect(self.updateBattery)
+        # timer.start(1000)
 
 
     def updateBattery(self):

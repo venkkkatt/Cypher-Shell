@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 
 import sys
-import os
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QProgressBar
-from PyQt5.QtCore import QTimer, Qt
-from PyQt5.QtGui import QFont, QPalette
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
 import psutil
 
 class MemWidget(QWidget):
@@ -12,7 +11,7 @@ class MemWidget(QWidget):
         super().__init__()
         self._mem_usage = 0.0
         self.initUI()
-        self.setupTimer()
+        # self.setupTimer()
         
     def initUI(self):
         self.setWindowFlags(
@@ -72,12 +71,12 @@ class MemWidget(QWidget):
         
         self.setLayout(layout)
         
-    def setupTimer(self):
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.updateMemUsage)
-        self.timer.start(1000) 
+    # def setupTimer(self):
+    #     self.timer = QTimer()
+    #     self.timer.timeout.connect(self.updateMemUsage)
+    #     self.timer.start(1000) 
         
-        self.updateMemUsage()
+    #     self.updateMemUsage()
     
     def updateMemUsage(self):
         try:

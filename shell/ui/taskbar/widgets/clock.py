@@ -10,9 +10,9 @@ class ClockWidget(QLabel):
 
         self.updateTime()
 
-        timer = QTimer(self)
-        timer.timeout.connect(self.updateTime)
-        timer.start(1000)
+        # timer = QTimer(self)
+        # timer.timeout.connect(self.updateTime)
+        # timer.start(1000)
 
         
     def updateTime(self):

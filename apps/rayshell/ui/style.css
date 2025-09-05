@@ -15,11 +15,10 @@ QWidget {
         background-color: rgb(16, 14, 10);
 
 
-    color: white;
+    color: #2f643d;
 }
 
 * {
-    font-family: 'VT323';
     color: #d99d04;
 }
 
@@ -31,7 +30,7 @@ QTextEdit {
 /* style.qss */
 QTextEdit#outputArea {
     background-color: rgb(11, 16, 10);
-    background-color: rgb(16, 14, 10);
+    background-color: #100e0a;
     border: none;
 }
 
@@ -61,6 +60,8 @@ QTabWidget::pane {
     /* background-color: #021500; */
 }
 QTabBar::tab {
+    font-family: 'VT323';
+    font-weight: 700;
     background-color: rgba(74, 74, 87, 0.06);
     color: #ffb923;
     font-size: 16px;
@@ -88,7 +89,7 @@ TextWidget {
     /* background-color: rgb(26, 17, 35); */
     color: #c58634;
     /* color: #2add1d; */
-    font-size: 25px;
+    font-size: 17px;
     /* color: rgb(69, 226, 163); */
 }
 
