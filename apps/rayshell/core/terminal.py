@@ -1,13 +1,13 @@
 import pty, os, threading, select, signal, pyte
 
 class Terminal:
-    def __init__(self, shellPath = "/home/venkat/rayshell/core/repl.py"):
+    def __init__(self, shellPath = "/usr/local/bin/rayshell"):
         self.pid, self.masterfd =  pty.fork()
         self.listeners = []
         self.alive = True
 
         if self.pid == 0:
-            os.execvp("python3", ["python3", shellPath])
+            os.execvp(shellPath, [shellPath])
 
         self.thread = threading.Thread(target=self.readFromPty, daemon=True)
         self.thread.start()

@@ -1,3 +1,9 @@
 file.txt
 **/__pycache__
 *.py[cod]
+build
+dist
+hioio
+storyEngine
+*.spec
+characters

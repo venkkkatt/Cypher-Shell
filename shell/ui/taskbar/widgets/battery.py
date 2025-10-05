@@ -1,26 +1,31 @@
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtWidgets import QLabel
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtWidgets import QLabel
 import psutil
 
 class BatteryWidget(QLabel):
     def __init__(self):
         super().__init__()
 
-        self.setStyleSheet("color:#b7efc5; padding : 0px 5px; border: 1px solid #70e000; border-radius: 1%;background-color: #036666;")
+        self.setStyleSheet("""
+            color: #b7efc5;
+            padding: 0px 5px;
+            border: 1px solid #70e000;
+            border-radius: 1%;
+            background-color: #036666;
+        """)
 
         self.updateBattery()
 
-        # timer = QTimer(self)
-        # timer.timeout.connect(self.updateBattery)
-        # timer.start(1000)
-
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.updateBattery)
+        self.timer.start(1000)
 
     def updateBattery(self):
         battery = psutil.sensors_battery()
         if battery is None:
             self.setText("N/A")
             return
-        
+
         percent = battery.percent
         charging = battery.power_plugged
 
@@ -37,4 +42,4 @@ class BatteryWidget(QLabel):
 
         status = "\uf0e7" if charging else icon
         self.setText(f"{status} {percent:.0f}%")
-
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)

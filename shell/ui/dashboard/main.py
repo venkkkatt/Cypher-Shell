@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 
-import sys, os, random
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QProgressBar, QGridLayout, QHBoxLayout, QGraphicsDropShadowEffect
-from PyQt5.QtCore import QTimer, Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QFont, QColor
-import psutil, subprocess, socket, getpass, platform
+import os,psutil,random,subprocess,socket,getpass,platform,sys
+
+from PyQt6.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QLabel, QProgressBar,
+    QGridLayout, QHBoxLayout, QGraphicsDropShadowEffect
+)
+from PyQt6.QtCore import QTimer, Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QFont, QColor
+
 from memory import MemWidget
+
 
 class SystemInfoWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.initUI()
-        self.updateInfo() 
+        self.updateInfo()
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.updateInfo)
@@ -30,23 +35,20 @@ class SystemInfoWidget(QWidget):
 
         self.os_label = QLabel("OS:")
         self.os_label.setFont(font_title)
-        self.os_label.setAlignment(Qt.AlignCenter)
+        self.os_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.host_label = QLabel("Logged in as:")
         self.host_label.setFont(font_title)
-        self.host_label.setAlignment(Qt.AlignCenter)
-
+        self.host_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.uptime_label = QLabel("Uptime: 0")
         self.uptime_label.setFont(font_title)
-        self.uptime_label.setAlignment(Qt.AlignCenter)
-
+        self.uptime_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout.addWidget(self.os_label)
         layout.addWidget(self.host_label)
         layout.addWidget(self.uptime_label)
 
-        
         self.setGlow(self)
 
     def setGlow(self, widget):
@@ -57,18 +59,17 @@ class SystemInfoWidget(QWidget):
         widget.setGraphicsEffect(shadow)
 
     def updateInfo(self):
-        # OS
+        # OS / host
         self.os_label.setText(f"OS..{platform.node()}")
-
         self.host_label.setText(f"Logged in as..{getpass.getuser()}")
 
-        uptime_sec = int(psutil.boot_time())
-        uptime = psutil.boot_time()
         import time
+        uptime = psutil.boot_time()
         uptime_sec = int(time.time() - uptime)
         hours, rem = divmod(uptime_sec, 3600)
         minutes, seconds = divmod(rem, 60)
         self.uptime_label.setText(f"Uptime..{hours}h {minutes}m {seconds}s")
+
 
 class CPUTempWidget(QWidget):
     def __init__(self):
@@ -81,15 +82,15 @@ class CPUTempWidget(QWidget):
 
         self.title_label = QLabel("CPU Temp")
         self.title_label.setFont(QFont("OCR A", 14))
-        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_label.setFixedSize(150, 30)
 
         self.temp_label = QLabel("N/A °C")
         self.temp_label.setFont(QFont("OCR A", 18))
-        self.temp_label.setAlignment(Qt.AlignCenter)
+        self.temp_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.temp_label.setFixedWidth(150)
         self.temp_label.setFixedHeight(64)
-        self.setFixedSize(150,150)
+        self.setFixedSize(150, 150)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
@@ -100,17 +101,17 @@ class CPUTempWidget(QWidget):
         layout.addWidget(self.temp_label)
         layout.addWidget(self.progress_bar)
 
-        self.progress_bar.setStyleSheet(f"""
-            QProgressBar {{
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
                 border: 1px solid #23D300;
                 border-radius: 4px;
                 background-color: transparent;
                 text-align: center;
-            }}
-            QProgressBar::chunk {{
+            }
+            QProgressBar::chunk {
                 background-color: #23D300;
                 border-radius: 3px;
-            }}
+            }
         """)
 
         self.setStyleSheet("""
@@ -139,6 +140,7 @@ class CPUTempWidget(QWidget):
             self.progress_bar.setValue(0)
             print(f"CPU Temp Error: {e}")
 
+
 class DiskWidget(QWidget):
     def __init__(self, path="/"):
         super().__init__()
@@ -151,15 +153,15 @@ class DiskWidget(QWidget):
 
         self.title_label = QLabel("DISK")
         self.title_label.setFont(QFont("OCR A", 15))
-        self.title_label.setAlignment(Qt.AlignCenter)
-        self.title_label.setFixedSize(134,32)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.title_label.setFixedSize(134, 32)
 
         self.disk_label = QLabel("N/A")
         self.disk_label.setFont(QFont("OCR A", 11))
-        self.disk_label.setAlignment(Qt.AlignCenter)
+        self.disk_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.disk_label.setFixedSize(134, 60)
         self.fillerLabel = QLabel("")
-        self.fillerLabel.setFixedSize(0,9)
+        self.fillerLabel.setFixedSize(0, 9)
 
         self.setFixedSize(234, 138)
 
@@ -181,6 +183,7 @@ class DiskWidget(QWidget):
             self.disk_label.setText("Error")
             print(f"Disk Error: {e}")
 
+
 class WifiThread(QThread):
     result = pyqtSignal(str, int, str)
 
@@ -188,17 +191,18 @@ class WifiThread(QThread):
         while True:
             ssid, signal = "N/A", 0
             try:
-                # set a timeout to prevent hanging
                 output = subprocess.check_output(
                     ["nmcli", "-t", "-f", "active,ssid,signal", "dev", "wifi"],
                     text=True,
                     timeout=1
                 )
                 for line in output.splitlines():
-                    active, name, sig = line.split(":")
-                    if active == "yes":
-                        ssid, signal = name, int(sig)
-                        break
+                    parts = line.split(":")
+                    if len(parts) >= 3:
+                        active, name, sig = parts[0], parts[1], parts[2]
+                        if active == "yes":
+                            ssid, signal = name, int(sig) if sig.isdigit() else 0
+                            break
             except subprocess.TimeoutExpired:
                 pass
             except Exception:
@@ -214,14 +218,16 @@ class WifiThread(QThread):
                 ip = "N/A"
 
             self.result.emit(ssid, signal, ip)
-            self.msleep(1000)
+            QThread.msleep(1000)
+
 
 class NetworkWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.initUI()
-        self.prev_bytes_sent = psutil.net_io_counters().bytes_sent
-        self.prev_bytes_recv = psutil.net_io_counters().bytes_recv
+        counters = psutil.net_io_counters()
+        self.prev_bytes_sent = counters.bytes_sent
+        self.prev_bytes_recv = counters.bytes_recv
 
         self.wifiThread = WifiThread()
         self.wifiThread.result.connect(self.updateWifiLabels)
@@ -232,18 +238,18 @@ class NetworkWidget(QWidget):
         self.setLayout(self.layout)
 
         self.title = QLabel("Network")
-        self.title.setAlignment(Qt.AlignCenter)
+        self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title.setFont(QFont("OCR A", 15))
         self.title.setFixedSize(270, 30)
 
         self.infoLabel = QLabel("SSID: N/A")
-        self.infoLabel.setAlignment(Qt.AlignCenter)
+        self.infoLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.infoLabel.setFont(QFont("OCR A", 8))
         self.infoLabel.setFixedWidth(270)
         self.infoLabel.setFixedHeight(27)
 
         self.infoLabel2 = QLabel("Signal: 0%")
-        self.infoLabel2.setAlignment(Qt.AlignCenter)
+        self.infoLabel2.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.infoLabel2.setFont(QFont("OCR A", 11))
         self.infoLabel2.setFixedWidth(270)
         self.infoLabel2.setFixedHeight(27)
@@ -254,14 +260,14 @@ class NetworkWidget(QWidget):
         self.progress_bar.setFixedHeight(8)
 
         self.infoLabel3 = QLabel("IP: N/A")
-        self.infoLabel3.setAlignment(Qt.AlignCenter)
+        self.infoLabel3.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.infoLabel3.setFont(QFont("OCR A", 11))
         self.infoLabel3.setFixedWidth(270)
         self.infoLabel3.setFixedHeight(30)
 
         self.label = QLabel("Up: 0 KB/s \nDown: 0 KB/s")
         self.label.setFont(QFont("OCR A", 11))
-        self.label.setAlignment(Qt.AlignCenter)
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setFixedHeight(50)
         self.label.setFixedWidth(270)
 
@@ -273,7 +279,7 @@ class NetworkWidget(QWidget):
         self.layout.addWidget(self.progress_bar)
         self.layout.addWidget(self.infoLabel3)
         self.layout.addWidget(self.label)
-        
+
         self.setStyleSheet("background-color:#00FF41; color:black;")
 
     def updateNetwork(self):
@@ -291,9 +297,7 @@ class NetworkWidget(QWidget):
     def updateWifiLabels(self, ssid, signal, ip):
         self.infoLabel.setText(f"SSID: {ssid}")
         self.infoLabel2.setText(f"Signal: {signal}%")
-
         self.infoLabel3.setText(f"IP: {ip}")
-
         self.progress_bar.setValue(int(signal))
         self.progress_bar.setStyleSheet(f"""
             QProgressBar {{
@@ -308,17 +312,18 @@ class NetworkWidget(QWidget):
             }}
         """)
 
+
 class BatteryWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.initBattery()
-    
+
     def initBattery(self):
         self.setWindowFlags(
-            Qt.WindowStaysOnBottomHint |
-            Qt.FramelessWindowHint |
-            Qt.WindowDoesNotAcceptFocus |
-            Qt.Tool
+            Qt.WindowType.WindowStaysOnBottomHint |
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowDoesNotAcceptFocus |
+            Qt.WindowType.Tool
         )
         self.setStyleSheet("""
             background-color:#00FF41;
@@ -330,23 +335,22 @@ class BatteryWidget(QWidget):
         font2 = QFont("OCR A", 20)
         self.batteryLabel = QLabel("")
         self.batteryLabel.setFont(font2)
-        self.batteryLabel.setAlignment(Qt.AlignCenter)
+        self.batteryLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.batteryTitle = QLabel("")
         self.batteryTitle.setFont(font)
         self.batteryLabel.setStyleSheet("color:black")
 
         layout.addWidget(self.batteryLabel)
-        # layout.addWidget(self.batteryTitle)
         self.setLayout(layout)
-        # self.timerBattery()
 
     def updateBattery(self):
         try:
             battery = psutil.sensors_battery()
             if battery is None:
-                self.setText("N/A")
+                # fixed bug: set the label text, not widget text
+                self.batteryLabel.setText("N/A")
                 return
-            
+
             percent = battery.percent
             charging = battery.power_plugged
 
@@ -366,77 +370,71 @@ class BatteryWidget(QWidget):
         except Exception as e:
             print(f"battery error {e}")
 
+
 class CPUWidget(QWidget):
     def __init__(self):
         super().__init__()
         self._cpu_usage = 0.0
         self.initUI()
-        # self.setupTimer()
-        
+
     def initUI(self):
         self.setWindowFlags(
-            Qt.WindowStaysOnBottomHint |
-            Qt.FramelessWindowHint |
-            Qt.WindowDoesNotAcceptFocus |
-            Qt.Tool
+            Qt.WindowType.WindowStaysOnBottomHint |
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowDoesNotAcceptFocus |
+            Qt.WindowType.Tool
         )
         self.setObjectName("mainWidget")
         self.setStyleSheet("""
-                       
             QLabel {
                 color: black;
                 background-color: #00FF41;
-                
             }
             QProgressBar {
                 border: 1px solid #00FF41;
-                
                 text-align: center;
             }
             QProgressBar::chunk {
                 background-color: transparent
             }
         """)
-        
+
         layout = QVBoxLayout()
-        # layout.setContentsMargins(20, 20, 20, 20)
-        # layout.setSpacing(10)
-        
+
         self.title_label = QLabel("CPU")
         self.title_label.setFixedHeight(30)
         title_font = QFont("OCR A", 17)
         self.title_label.setFont(title_font)
-        self.title_label.setAlignment(Qt.AlignCenter)
-        
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         self.cpu_label = QLabel("0%")
         cpu_font = QFont("OCR A", 20)
         self.cpu_label.setFixedHeight(60)
-
         self.cpu_label.setFont(cpu_font)
-        self.cpu_label.setAlignment(Qt.AlignCenter)
-        
+        self.cpu_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setFixedHeight(8)
-        
+
         layout.addWidget(self.title_label)
         layout.addWidget(self.cpu_label)
         layout.addWidget(self.progress_bar)
-        
+
         self.setLayout(layout)
-    
+
     def updateCpuUsage(self):
         try:
             usage = psutil.cpu_percent(interval=None)
             self._cpu_usage = usage
-            
+
             self.cpu_label.setText(f"{int(usage)}%")
             self.progress_bar.setValue(int(usage))
-            
+
             color = self.getCpuColor(usage)
             self.cpu_label.setStyleSheet(f"color: black;")
-            
+
             self.progress_bar.setStyleSheet(f"""
                 QProgressBar {{
                     border: 1px solid #23D300;
@@ -449,20 +447,21 @@ class CPUWidget(QWidget):
                     border-radius: 3px;
                 }}
             """)
-            
+
             if usage > 80:
                 self.setWindowOpacity(0.7)
             else:
                 self.setWindowOpacity(0.85)
-                
+
         except Exception as e:
             print(f"Error reading CPU usage: {e}")
-    
+
     def getCpuColor(self, usage):
         if usage < 60:
             return "#23D300"
         return "#FF5024"
-    
+
+
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
@@ -472,14 +471,12 @@ class MainWindow(QWidget):
         self.batteryWidget = BatteryWidget()
         self.cpuTempWidget = CPUTempWidget()
         self.diskWidget = DiskWidget()
-        # self.cpuWidget.setStyleSheet("background-color:#00FF41")
         self.batteryWidget.setStyleSheet("background-color:#00FF41")
         self.networkWidget = NetworkWidget()
-        # self.networkWidget.setFixedSize(300,60)
 
-        self.cpuWidget.setFixedSize(150,150)
-        self.memWidget.setFixedSize(150,150)
-        self.batteryWidget.setFixedSize(150,80)
+        self.cpuWidget.setFixedSize(150, 150)
+        self.memWidget.setFixedSize(150, 150)
+        self.batteryWidget.setFixedSize(150, 80)
         self.systemWidget = SystemInfoWidget()
 
         layout = QGridLayout()
@@ -487,26 +484,24 @@ class MainWindow(QWidget):
         hLayout = QHBoxLayout()
         hLayout2 = QHBoxLayout()
         hLayout4 = QHBoxLayout()
-        # hLayout2.setAlignment(Qt.AlignTop)
-        hLayout.addWidget(self.cpuWidget, alignment=Qt.AlignLeft)
-        hLayout4.addWidget(self.cpuTempWidget, alignment=Qt.AlignLeft)
-        hLayout4.addWidget(self.systemWidget, alignment=Qt.AlignRight)
-        # layout.addWidget(self.memWidget)
+
+        hLayout.addWidget(self.cpuWidget, alignment=Qt.AlignmentFlag.AlignLeft)
+        hLayout4.addWidget(self.cpuTempWidget, alignment=Qt.AlignmentFlag.AlignLeft)
+        hLayout4.addWidget(self.systemWidget, alignment=Qt.AlignmentFlag.AlignRight)
         hLayout2.addWidget(self.memWidget)
-        hLayout3.addWidget(self.diskWidget, alignment=Qt.AlignLeft)
-        hLayout2.addWidget(self.networkWidget, alignment=Qt.AlignRight)
-        # hLayout2.addWidget(self.batteryWidget, alignment=Qt.AlignRight)
+        hLayout3.addWidget(self.diskWidget, alignment=Qt.AlignmentFlag.AlignLeft)
+        hLayout2.addWidget(self.networkWidget, alignment=Qt.AlignmentFlag.AlignRight)
 
         layout.addLayout(hLayout4, 0, 0)
-        layout.addLayout(hLayout3,1, 0)
+        layout.addLayout(hLayout3, 1, 0)
         layout.addLayout(hLayout, 2, 0)
         layout.addLayout(hLayout2, 3, 0)
-        self.setLayout(layout) 
+        self.setLayout(layout)
 
         self.setWindowFlags(
-            Qt.FramelessWindowHint |
-            Qt.WindowStaysOnBottomHint |
-            Qt.Tool
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnBottomHint |
+            Qt.WindowType.Tool
         )
         self.setGlow(self.cpuWidget)
         self.setGlow(self.memWidget)
@@ -518,7 +513,7 @@ class MainWindow(QWidget):
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.updateAll)
-        self.timer.start(1000) 
+        self.timer.start(1000)
 
     def updateAll(self):
         self.cpuWidget.updateCpuUsage()
@@ -536,21 +531,21 @@ class MainWindow(QWidget):
             orig_opacity = widget.windowOpacity()
 
             effects = [
-                lambda: widget.setStyleSheet("background-color:#007f5f; color:#00FF41;"),  
+                lambda: widget.setStyleSheet("background-color:#007f5f; color:#00FF41;"),
                 lambda: widget.setStyleSheet("background-color:#00FF41; color:#FF004D;"),
                 lambda: widget.setGeometry(orig_geo.adjusted(
                     random.randint(-5, 5), random.randint(-5, 5),
-                    random.randint(-5, 5), random.randint(-5, 5))),  
+                    random.randint(-5, 5), random.randint(-5, 5))),
                 lambda: widget.setWindowOpacity(0.6),
             ]
 
             random.choice(effects)()
 
-            QTimer.singleShot(duration, lambda: [
+            QTimer.singleShot(duration, lambda: (
                 widget.setStyleSheet(orig_style),
                 widget.setGeometry(orig_geo),
                 widget.setWindowOpacity(orig_opacity),
-            ])
+            ))
 
         timer.timeout.connect(glitch)
         timer.start(interval)
@@ -563,12 +558,13 @@ class MainWindow(QWidget):
         shadow.setOffset(0, 0)
         widget.setGraphicsEffect(shadow)
 
+
 def main():
     app = QApplication(sys.argv)
 
     app.setApplicationName("dashboard")
     app.setApplicationDisplayName("dashboard")
-    
+
     mainWidget = MainWindow()
     mainWidget.setStyleSheet("""
         background-color: transparent;
@@ -576,9 +572,10 @@ def main():
     """)
     mainWidget.setWindowTitle("dashboard")
     mainWidget.setProperty("class", "dashboard")
-    
+
     mainWidget.show()
-    return app.exec_()
+    return app.exec()
+
 
 if __name__ == "__main__":
     sys.exit(main())

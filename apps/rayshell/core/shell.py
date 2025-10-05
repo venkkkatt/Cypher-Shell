@@ -6,9 +6,12 @@ class RayShell:
 
         self.listeners = []
         self.listeners2 = []
-
+         
+        modelPath = os.environ.get("RAYSHELL_MODEL_PATH", "/home/neo/opt/models/openhermes-2.5-mistral-7b.Q5_K_M.gguf")
+        if not os.path.exists(modelPath):
+            raise FileNotFoundError("The LLM needed for Rayshell wasn't found!")
         self.llm = Llama(
-            model_path="/home/venkat/Downloads/openhermes-2.5-mistral-7b.Q5_K_M.gguf",
+            model_path=modelPath,
             chat_format="chatml",
             n_ctx=8192,
             n_threads=12,
@@ -114,12 +117,7 @@ Rules of engagement:
             }
         parts = re.split(r"\s+|;|&&|\|\|", cmd.strip())
         return any(p in danger for p in parts)
-        base =  cmd.strip().split()[0]
-        print(base)
-        if base in danger:
-            return True
-        else:
-            return False
+        
 
     def intercept(self, cmd):
          shell = re.search(r"\[SHELL\]: '(.+?)'", cmd)
@@ -139,9 +137,7 @@ Rules of engagement:
     def sendCmd(self, cmd : str):
         try:
             proc = subprocess.run(
-                cmd,
-                shell=True,
-                executable='/bin/bash',
+                ["/usr/local/bin/rayshell", "-c", cmd],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True
