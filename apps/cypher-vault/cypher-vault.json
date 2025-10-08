@@ -1,0 +1,21 @@
+ {
+    "theme": "cyberpunk",
+    "font_family": "JetBrains Mono",
+    "font_size_pt": 10,
+    "colors": {
+        "background": "#08080A",
+        "panel": "#121214",
+        "accent": "#f28482",
+        "muted": "#4B515D",
+        "panel_alt": "#121214",
+        "highlight": "#FF00C8",
+        "file_bg": "#0A0A0C",
+        "text": "#F0F0F0",
+        "separator": "#2C2F36"
+    },
+    "preview": {
+        "max_image_dim": 1024,
+        "text_preview_lines": 400
+    },
+    "sidebar": ["Home", "Documents", "Downloads", "Pictures", "Music", "Videos", "Trash"]
+}

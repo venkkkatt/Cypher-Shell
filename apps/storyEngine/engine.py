@@ -5,7 +5,7 @@ from llama_cpp import Llama
 class LLM:
     def __init__(self):
         self.llm = Llama(
-            model_path="/home/venkat/Downloads/openhermes-2.5-mistral-7b.Q5_K_M.gguf",
+            model_path="/home/neo/opt/models/openhermes-2.5-mistral-7b.Q5_K_M.gguf",
             chat_format="chatml",
             n_ctx=8192,
             n_threads=12,

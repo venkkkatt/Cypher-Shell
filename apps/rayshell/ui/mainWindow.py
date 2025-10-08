@@ -6,7 +6,6 @@ from PyQt6.QtWidgets import (
     QMessageBox
 )
 from apps.rayshell.core.shell import RayShell
-from apps.storyEngine.engine import Main
 from apps.rayshell.core.terminal import Terminal
 import os, re, sys
 
