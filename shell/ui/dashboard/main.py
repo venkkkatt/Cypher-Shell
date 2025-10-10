@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os,psutil,random,subprocess,socket,getpass,platform,sys
+os.environ["QT_QPA_PLATFORM"] = "xcb"
 
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QLabel, QProgressBar,
@@ -10,6 +11,7 @@ from PyQt6.QtCore import QTimer, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont, QColor
 
 from memory import MemWidget
+
 
 
 class SystemInfoWidget(QWidget):
@@ -503,6 +505,7 @@ class MainWindow(QWidget):
             Qt.WindowType.WindowStaysOnBottomHint |
             Qt.WindowType.Tool
         )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setGlow(self.cpuWidget)
         self.setGlow(self.memWidget)
         self.setGlow(self.diskWidget)
