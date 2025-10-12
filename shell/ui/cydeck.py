@@ -23,7 +23,6 @@ class CyberDeck(QWidget):
         super().__init__()
         self.is_wifi_enabled = False
         self.is_volume_muted = False
-        self.is_dnd_enabled = False
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
@@ -247,17 +246,21 @@ class CyberDeck(QWidget):
         icon = active_icon if is_active else inactive_icon
         if button.objectName() == "volume":
             label = 'UNMUTED' if not self.is_volume_muted else 'MUTED'
-        elif button.objectName() == "dnd":
-            label = 'SILENT' if is_active else 'READY'
         elif button.objectName() == "wifi":
             label = 'ONLINE' if is_active else 'OFFLINE'
+        elif button.objectName() == "file_manager":
+            label = 'FILES'
+            icon = '📁'
         else:
             label = (active_label if is_active and active_label else
                      inactive_label if not is_active and inactive_label else
                      ('ACTIVE' if is_active else 'INACTIVE'))
         button.setText(f"{icon}\n{label}")
-        if is_active:
-            button.setProperty("class", "active")
+        if button.objectName() == "wifi" or button.objectName() == "volume":
+            if is_active:
+                button.setProperty("class", "active")
+            else:
+                button.setProperty("class", "")
         else:
             button.setProperty("class", "")
         button.style().polish(button)
@@ -265,8 +268,11 @@ class CyberDeck(QWidget):
     def _setup_control_grid(self):
         self.wifi_btn = self._create_toggle_button("🌐\nNET", self.toggle_wifi, "wifi")
         self.controls_grid.addWidget(self.wifi_btn, 0, 0)
-        self.dnd_btn = self._create_toggle_button("🔕\nDND", self.toggle_dnd, "dnd")
-        self.controls_grid.addWidget(self.dnd_btn, 0, 1)
+        self.file_manager_btn = QPushButton("📁\nFILES")
+        self.file_manager_btn.setFont(self.font_mono)
+        self.file_manager_btn.clicked.connect(self.launch_file_manager)
+        self.file_manager_btn.setObjectName("file_manager")
+        self.controls_grid.addWidget(self.file_manager_btn, 0, 1)
         self.snapshot_btn = QPushButton("📸\nSCRN")
         self.snapshot_btn.setFont(self.font_mono)
         self.snapshot_btn.clicked.connect(self.take_snapshot)
@@ -289,7 +295,7 @@ class CyberDeck(QWidget):
         self.controls_grid.addWidget(self.power_btn, 1, 2)
 
     def launch_settings(self):
-        settings_commands = ["nautilus",]
+        settings_commands = ["/usr/local/bin/synapse-settings", "gnome-control-center"]
         for cmd in settings_commands:
             try:
                 subprocess.Popen([cmd])
@@ -299,34 +305,24 @@ class CyberDeck(QWidget):
                 continue
         pass
 
+    def launch_file_manager(self):
+        fm_commands = ["/usr/local/bin/cypher-vault-dir/cypher-vault","nautilus", "dolphin", "thunar", "pcmanfm"]
+        for cmd in fm_commands:
+            try:
+                subprocess.Popen([cmd])
+                self.close_window()
+                return
+            except FileNotFoundError:
+                continue
+        pass
+
     def close_window(self):
-        QApplication.quit()
-
-    def toggle_dnd(self):
-        try:
-            target_state = not self.is_dnd_enabled
-
-            subprocess.run([
-                "gdbus", "call", "--session",
-                "--dest", "org.m4de.Mako",
-                "--object-path", "/org/m4de/Mako",
-                "--method", "org.m4de.Mako.SetDnd",
-                f"{str(target_state).lower()}"
-            ], check=True, stderr=subprocess.DEVNULL)
-
-            self.is_dnd_enabled = target_state
-            self.render_toggle_states()
-
-        except Exception:
-            self.is_dnd_enabled = not self.is_dnd_enabled
-            self.render_toggle_states()
+        self.hide()
 
     def take_snapshot(self):
         was_visible = self.isVisible()
-
         if was_visible:
             self.hide()
-
         QTimer.singleShot(100, lambda: self._execute_snapshot_sequence(was_visible))
 
     def _execute_snapshot_sequence(self, was_visible):
@@ -334,29 +330,22 @@ class CyberDeck(QWidget):
         try:
             slurp_result = subprocess.run(["slurp"], capture_output=True, text=True, check=True)
             slurp_output = slurp_result.stdout.strip()
-
             if not slurp_output:
                 raise subprocess.CalledProcessError(1, "slurp", "User cancelled selection.")
-
         except subprocess.CalledProcessError:
             if was_visible:
                 self.show()
             return
         except FileNotFoundError:
             pass
-
         success = False
         timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         home_dir = os.path.expanduser("~")
         screenshot_path = os.path.join(home_dir, "Pictures", f"screenshot-{timestamp}.png")
-
         snapshot_commands = []
         if slurp_output:
-             snapshot_commands.append(["grim", "-g", slurp_output, screenshot_path])
-
+            snapshot_commands.append(["grim", "-g", slurp_output, screenshot_path])
         snapshot_commands.append(["spectacle", "-f"])
-
-
         for cmd in snapshot_commands:
             try:
                 subprocess.run(cmd, check=True)
@@ -364,7 +353,6 @@ class CyberDeck(QWidget):
                 break
             except (FileNotFoundError, subprocess.CalledProcessError):
                 continue
-
         if success:
             self.close_window()
         elif was_visible:
@@ -398,22 +386,11 @@ class CyberDeck(QWidget):
             self.is_volume_muted = "yes" in out
         except:
             self.is_volume_muted = False
-        try:
-            dnd_status = subprocess.run(
-                ["gdbus", "call", "--session",
-                 "--dest", "org.m4de.Mako",
-                 "--object-path", "/org/m4de/Mako",
-                 "--method", "org.m4de.Mako.GetDnd"],
-                capture_output=True, text=True, check=True).stdout.strip().lower()
-
-            self.is_dnd_enabled = "true" in dnd_status
-        except Exception:
-            self.is_dnd_enabled = False
 
     def render_toggle_states(self):
         self._set_button_state(self.wifi_btn, self.is_wifi_enabled, "🌐", "🚫")
         self._set_button_state(self.vol_mute_btn, not self.is_volume_muted, "🔊", "🔇")
-        self._set_button_state(self.dnd_btn, self.is_dnd_enabled, "🔕", "🔔")
+        self._set_button_state(self.file_manager_btn, False, "📁", "📁", active_label="FILES", inactive_label="FILES")
 
     def toggle_wifi(self):
         try:
