@@ -2,15 +2,16 @@
 import sys
 import subprocess
 import datetime
+import os
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QCalendarWidget, 
+    QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QCalendarWidget,
     QSlider, QHBoxLayout, QGridLayout, QFrame
 )
 from PyQt6.QtCore import Qt, QTimer, QSize, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtGui import QFont
 
 COLOR_ACCENT = "#90EE90"
-COLOR_BG_DARK = "#0a131f"
+COLOR_BG_DARK = "#0a131f79"
 COLOR_BG_SOLID = "#17212b"
 COLOR_PRIMARY_TEXT = "#F0FFF0"
 COLOR_INACTIVE = "#36414d"
@@ -22,7 +23,7 @@ class CyberDeck(QWidget):
         super().__init__()
         self.is_wifi_enabled = False
         self.is_volume_muted = False
-        self.is_dnd_enabled = False 
+        self.is_dnd_enabled = False
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
@@ -37,114 +38,114 @@ class CyberDeck(QWidget):
         self.font_time.setBold(True)
         self.font_date = QFont(["OCR A", "OCR A Extended", "monospace"], 11)
         self.setStyleSheet(f"""
-            QWidget {{ 
-                background-color: {COLOR_BG_DARK}; 
-                color: {COLOR_PRIMARY_TEXT}; 
-                border-radius: 12px; 
-                border: 2px solid {COLOR_INACTIVE}; 
+            QWidget {{
+                background-color: {COLOR_BG_DARK};
+                color: {COLOR_PRIMARY_TEXT};
+                border-radius: 4px;
+                border: 2px solid {COLOR_INACTIVE};
             }}
             QLabel, QCalendarWidget, QSlider, QPushButton, QFrame {{
-                background-color: {COLOR_BG_SOLID}; 
+                background-color: {COLOR_BG_SOLID};
                 color: {COLOR_PRIMARY_TEXT};
                 border: none;
             }}
-            #clock_label {{ 
-                color: {COLOR_ACCENT}; 
-                padding-top: 8px; 
-                padding-bottom: 0px; 
+            #clock_label {{
+                color: {COLOR_ACCENT};
+                padding-top: 8px;
+                padding-bottom: 0px;
             }}
-            #date_label {{ 
-                color: {COLOR_ACCENT}; 
-                padding-top: 0px; 
-                padding-bottom: 8px; 
+            #date_label {{
+                color: {COLOR_ACCENT};
+                padding-top: 0px;
+                padding-bottom: 8px;
             }}
-            QCalendarWidget {{ 
-                border: 1px solid {COLOR_INACTIVE}; 
-                border-radius: 6px; 
-                font-family: "JetBrains Mono"; 
-                font-size: 10pt; 
-                background-color: {COLOR_BG_SOLID}; 
+            QCalendarWidget {{
+                border: 1px solid {COLOR_INACTIVE};
+                border-radius: 6px;
+                font-family: "JetBrains Mono";
+                font-size: 10pt;
+                background-color: {COLOR_BG_SOLID};
             }}
-            QCalendarWidget QWidget#qt_calendar_navigationbar {{ 
-                background-color: {COLOR_INACTIVE}; 
-                color: {COLOR_PRIMARY_TEXT}; 
+            QCalendarWidget QWidget#qt_calendar_navigationbar {{
+                background-color: {COLOR_INACTIVE};
+                color: {COLOR_PRIMARY_TEXT};
                 border-top-left-radius: 5px;
                 border-top-right-radius: 5px;
             }}
-            QCalendarWidget QToolButton {{ 
-                background-color: {COLOR_INACTIVE}; 
-                color: {COLOR_PRIMARY_TEXT}; 
-                border: none; 
+            QCalendarWidget QToolButton {{
+                background-color: {COLOR_INACTIVE};
+                color: {COLOR_PRIMARY_TEXT};
+                border: none;
                 border-radius: 4px;
-                padding: 4px; 
+                padding: 4px;
             }}
-            QCalendarWidget QToolButton:hover {{ background-color: {COLOR_ACCENT}; color: {COLOR_BG_DARK}; }}
+            QCalendarWidget QToolButton:hover {{ background-color: {COLOR_ACCENT}; color: {COLOR_BG_SOLID}; }}
             QCalendarWidget QSpinBox {{ border: 1px solid {COLOR_PRIMARY_TEXT}; color: {COLOR_PRIMARY_TEXT}; background-color: {COLOR_BG_DARK}; }}
-            QCalendarWidget QAbstractItemView {{ 
-                background-color: {COLOR_BG_SOLID}; 
-                selection-background-color: {COLOR_ACCENT}; 
-                selection-color: {COLOR_BG_SOLID}; 
-                color: {COLOR_PRIMARY_TEXT}; 
-                outline: 0; 
+            QCalendarWidget QAbstractItemView {{
+                background-color: {COLOR_BG_SOLID};
+                selection-background-color: {COLOR_ACCENT};
+                selection-color: {COLOR_BG_SOLID};
+                color: {COLOR_PRIMARY_TEXT};
+                outline: 0;
                 border: none;
                 padding: 2px;
             }}
             QCalendarWidget QAbstractItemView::item {{
-                background-color: {COLOR_BG_SOLID}; 
+                background-color: {COLOR_BG_SOLID};
                 color: {COLOR_PRIMARY_TEXT};
-                border: 1px solid {COLOR_BG_SOLID}; 
+                border: 1px solid {COLOR_BG_SOLID};
             }}
-            QCalendarWidget QAbstractItemView::item:selected {{ 
-                background-color: {COLOR_ACCENT}; 
-                color: {COLOR_BG_DARK}; 
-                border-radius: 3px; 
+            QCalendarWidget QAbstractItemView::item:selected {{
+                background-color: {COLOR_ACCENT};
+                color: {COLOR_BG_SOLID};
+                border-radius: 3px;
                 font-weight: bold;
             }}
-            QCalendarWidget QAbstractItemView::item:!enabled {{ 
-                color: {COLOR_INACTIVE}; 
+            QCalendarWidget QAbstractItemView::item:!enabled {{
+                color: {COLOR_INACTIVE};
             }}
-            QPushButton {{ 
-                background-color: {COLOR_BG_SOLID}; 
-                color: {COLOR_PRIMARY_TEXT}; 
-                border: 1px solid {COLOR_INACTIVE}; 
-                padding: 8px; 
-                border-radius: 6px; 
-                font-size: 14px; 
+            QPushButton {{
+                background-color: {COLOR_BG_SOLID};
+                color: {COLOR_PRIMARY_TEXT};
+                border: 1px solid {COLOR_INACTIVE};
+                padding: 8px;
+                border-radius: 1px;
+                font-size: 14px;
                 font-family: "JetBrains Mono";
                 text-align: center;
-                min-height: 45px; 
+                min-height: 45px;
             }}
-            QPushButton:hover {{ 
-                background-color: {COLOR_INACTIVE}; 
+            QPushButton:hover {{
+                background-color: {COLOR_INACTIVE};
             }}
             QPushButton.active {{
-                background-color: {COLOR_ACCENT}; 
-                color: {COLOR_BG_DARK}; 
+                background-color: {COLOR_ACCENT};
+                color: {COLOR_BG_SOLID};
                 font-weight: bold;
-                border: 1px solid {COLOR_ACCENT}; 
+                border: 1px solid {COLOR_ACCENT};
             }}
             QPushButton.critical {{
-                background-color: {COLOR_CRITICAL}; 
-                color: {COLOR_BG_DARK}; 
+                background-color: {COLOR_CRITICAL};
+                color: {COLOR_BG_SOLID};
                 font-weight: bold;
-                border: 1px solid {COLOR_CRITICAL}; 
+                border: 1px solid {COLOR_CRITICAL};
             }}
-            QSlider::groove:horizontal {{ 
-                background: {COLOR_INACTIVE}; 
-                height: 8px; 
-                border-radius: 4px; 
+            QSlider::groove:horizontal {{
+                background: {COLOR_INACTIVE};
+                height: 8px;
+                border-radius: 4px;
             }}
-            QSlider::handle:horizontal {{ 
-                background: {COLOR_ACCENT}; 
-                width: 16px; 
-                border-radius: 8px; 
-                margin: -4px 0; 
+            QSlider::handle:horizontal {{
+                background: {COLOR_ACCENT};
+                width: 16px;
+                border-radius: 8px;
+                margin: -4px 0;
             }}
-            QFrame[frameShape="4"] {{ 
-                border: none; 
-                background-color: {COLOR_INACTIVE}; 
-                height: 1px; 
-                margin-top: 5px; 
+            QFrame[frameShape="4"] {{
+                border: none;
+                background-color: {COLOR_INACTIVE};
+                height: 1px;
+                margin-top: 5px;
                 margin-bottom: 5px;
             }}
         """)
@@ -166,7 +167,7 @@ class CyberDeck(QWidget):
         layout.addLayout(time_date_vbox)
         layout.addWidget(self._create_separator("CALENDAR"))
         self.calendar = QCalendarWidget()
-        self.calendar.setMaximumHeight(180)
+        self.calendar.setMaximumHeight(190)
         layout.addWidget(self.calendar)
         layout.addWidget(self._create_separator("AUDIO"))
         vol_layout = QHBoxLayout()
@@ -179,6 +180,30 @@ class CyberDeck(QWidget):
         self.vol_mute_btn = self._create_toggle_button("🔊\nAUD", self.toggle_volume, "volume", min_size=QSize(70, 45))
         vol_layout.addWidget(self.vol_mute_btn)
         layout.addLayout(vol_layout)
+        layout.addWidget(self._create_separator("BRIGHTNESS"))
+        brightness_layout = QHBoxLayout()
+        brightness_layout.setSpacing(10)
+        self.brightness_slider = QSlider(Qt.Orientation.Horizontal)
+        self.brightness_slider.setRange(0, 100)
+        self.brightness_slider.setValue(self.get_brightness())
+        self.brightness_slider.valueChanged.connect(self.set_brightness)
+        brightness_layout.addWidget(self.brightness_slider)
+        self.brightness_icon_label = QLabel("🔆\nBTR")
+        self.brightness_icon_label.setFont(self.font_mono)
+        self.brightness_icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.brightness_icon_label.setFixedSize(QSize(70, 45))
+        self.brightness_icon_label.setStyleSheet(f"""
+            QLabel {{
+                background-color: {COLOR_BG_SOLID};
+                color: {COLOR_PRIMARY_TEXT};
+                border: 1px solid {COLOR_INACTIVE};
+                padding: 8px;
+                border-radius: 1px;
+                font-size: 14px;
+            }}
+        """)
+        brightness_layout.addWidget(self.brightness_icon_label)
+        layout.addLayout(brightness_layout)
         layout.addWidget(self._create_separator("UTILITIES"))
         self.controls_grid = QGridLayout()
         self.controls_grid.setSpacing(10)
@@ -187,17 +212,18 @@ class CyberDeck(QWidget):
         layout.addStretch(1)
         self.setLayout(layout)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.timer_slow = QTimer(self) 
+        self.timer_slow = QTimer(self)
         self.timer_slow.timeout.connect(self.update_clock)
         self.timer_slow.start(1000)
         self.update_toggle_states()
+        self.render_toggle_states()
 
     def _create_separator(self, title):
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
         line.setFrameShadow(QFrame.Shadow.Plain)
         line.setObjectName("separator_line")
-        title_label = QLabel(f"  {title}") 
+        title_label = QLabel(f"  {title}")
         title_label.setFont(self.font_stats)
         hbox = QHBoxLayout()
         hbox.setContentsMargins(0, 0, 0, 0)
@@ -226,7 +252,7 @@ class CyberDeck(QWidget):
         elif button.objectName() == "wifi":
             label = 'ONLINE' if is_active else 'OFFLINE'
         else:
-            label = (active_label if is_active and active_label else 
+            label = (active_label if is_active and active_label else
                      inactive_label if not is_active and inactive_label else
                      ('ACTIVE' if is_active else 'INACTIVE'))
         button.setText(f"{icon}\n{label}")
@@ -255,80 +281,117 @@ class CyberDeck(QWidget):
         self.reboot_btn.setProperty("class", "critical")
         self.reboot_btn.style().polish(self.reboot_btn)
         self.controls_grid.addWidget(self.reboot_btn, 1, 1)
-        self.power_btn = QPushButton("⏻\nCLOSE")
+        self.power_btn = QPushButton("⏻\nTERMINATE")
         self.power_btn.setFont(self.font_mono)
-        self.power_btn.clicked.connect(QApplication.instance().quit)
+        self.power_btn.clicked.connect(self.shutdown_now)
         self.power_btn.setProperty("class", "critical")
         self.power_btn.style().polish(self.power_btn)
         self.controls_grid.addWidget(self.power_btn, 1, 2)
 
     def launch_settings(self):
-        settings_commands = ["gnome-control-center", "systemsettings", "cinnamon-settings", "xfce4-settings-manager", "kde-settings"]
+        settings_commands = ["nautilus",]
         for cmd in settings_commands:
             try:
-                subprocess.Popen([cmd]) 
+                subprocess.Popen([cmd])
+                self.close_window()
                 return
             except FileNotFoundError:
                 continue
-        pass 
+        pass
+
+    def close_window(self):
+        QApplication.quit()
 
     def toggle_dnd(self):
         try:
-            new_state = "true" if not self.is_dnd_enabled else "false"
+            target_state = not self.is_dnd_enabled
+
             subprocess.run([
                 "gdbus", "call", "--session",
-                "--dest", "org.gnome.Shell.Notifications",
-                "--object-path", "/org/gnome/Shell/Notifications",
-                "--method", "org.gnome.Shell.Notifications.SetMode",
-                f"{new_state}" 
-            ], check=False, stderr=subprocess.DEVNULL)
-            gsettings_schema = "org.gnome.desktop.notifications"
-            subprocess.run(
-                ["gsettings", "set", gsettings_schema, "mode", new_state.capitalize()], 
-                check=False, stderr=subprocess.DEVNULL)
-            self.is_dnd_enabled = not self.is_dnd_enabled
+                "--dest", "org.m4de.Mako",
+                "--object-path", "/org/m4de/Mako",
+                "--method", "org.m4de.Mako.SetDnd",
+                f"{str(target_state).lower()}"
+            ], check=True, stderr=subprocess.DEVNULL)
+
+            self.is_dnd_enabled = target_state
             self.render_toggle_states()
+
         except Exception:
             self.is_dnd_enabled = not self.is_dnd_enabled
             self.render_toggle_states()
-        
+
     def take_snapshot(self):
-        snapshot_commands = [
-            ["gnome-screenshot"], 
-            ["scrot"],            
-            ["spectacle", "-f"],  
-        ]
         was_visible = self.isVisible()
+
         if was_visible:
             self.hide()
-        QTimer.singleShot(100, lambda: self._execute_snapshot(snapshot_commands, was_visible))
 
-    def _execute_snapshot(self, commands, was_visible):
-        for cmd in commands:
+        QTimer.singleShot(100, lambda: self._execute_snapshot_sequence(was_visible))
+
+    def _execute_snapshot_sequence(self, was_visible):
+        slurp_output = None
+        try:
+            slurp_result = subprocess.run(["slurp"], capture_output=True, text=True, check=True)
+            slurp_output = slurp_result.stdout.strip()
+
+            if not slurp_output:
+                raise subprocess.CalledProcessError(1, "slurp", "User cancelled selection.")
+
+        except subprocess.CalledProcessError:
+            if was_visible:
+                self.show()
+            return
+        except FileNotFoundError:
+            pass
+
+        success = False
+        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        home_dir = os.path.expanduser("~")
+        screenshot_path = os.path.join(home_dir, "Pictures", f"screenshot-{timestamp}.png")
+
+        snapshot_commands = []
+        if slurp_output:
+             snapshot_commands.append(["grim", "-g", slurp_output, screenshot_path])
+
+        snapshot_commands.append(["spectacle", "-f"])
+
+
+        for cmd in snapshot_commands:
             try:
                 subprocess.run(cmd, check=True)
+                success = True
                 break
             except (FileNotFoundError, subprocess.CalledProcessError):
-                pass
-        if was_visible:
+                continue
+
+        if success:
+            self.close_window()
+        elif was_visible:
             self.show()
-                
+
     def reboot_system(self):
         try:
-            subprocess.run(["shutdown", "-r", "now"], check=True)
+            subprocess.run(["trinity","reboot"], check=True)
         except:
-            pass 
-            
+            pass
+
+    def shutdown_now(self):
+        try:
+            subprocess.run(["trinity","shutdown"], check=True)
+        except:
+            pass
+
     def update_clock(self):
         now = datetime.datetime.now()
         self.time_label.setText(now.strftime("%H:%M:%S"))
-        self.date_label.setText(now.strftime("%Y-%m-%d")) 
+        self.date_label.setText(now.strftime("%Y-%m-%d"))
 
     def update_toggle_states(self):
         try:
             status = subprocess.run(["nmcli", "radio", "wifi"], capture_output=True, text=True).stdout.strip().lower()
             self.is_wifi_enabled = "enabled" in status
-        except: 
+        except:
             self.is_wifi_enabled = False
         try:
             out = subprocess.run(["pactl", "get-sink-mute", "@DEFAULT_SINK@"], capture_output=True, text=True).stdout
@@ -337,17 +400,20 @@ class CyberDeck(QWidget):
             self.is_volume_muted = False
         try:
             dnd_status = subprocess.run(
-                ["gsettings", "get", "org.gnome.desktop.notifications", "mode"], 
-                capture_output=True, text=True).stdout.strip().strip("'").lower()
-            self.is_dnd_enabled = "true" in dnd_status or "disabled" not in dnd_status
-        except:
+                ["gdbus", "call", "--session",
+                 "--dest", "org.m4de.Mako",
+                 "--object-path", "/org/m4de/Mako",
+                 "--method", "org.m4de.Mako.GetDnd"],
+                capture_output=True, text=True, check=True).stdout.strip().lower()
+
+            self.is_dnd_enabled = "true" in dnd_status
+        except Exception:
             self.is_dnd_enabled = False
-        self.render_toggle_states()
 
     def render_toggle_states(self):
         self._set_button_state(self.wifi_btn, self.is_wifi_enabled, "🌐", "🚫")
-        self._set_button_state(self.vol_mute_btn, not self.is_volume_muted, "🔊", "🔇") 
-        self._set_button_state(self.dnd_btn, self.is_dnd_enabled, "🔕", "🔔") 
+        self._set_button_state(self.vol_mute_btn, not self.is_volume_muted, "🔊", "🔇")
+        self._set_button_state(self.dnd_btn, self.is_dnd_enabled, "🔕", "🔔")
 
     def toggle_wifi(self):
         try:
@@ -355,7 +421,7 @@ class CyberDeck(QWidget):
             subprocess.run(["nmcli", "radio", "wifi", action], check=True)
             self.is_wifi_enabled = not self.is_wifi_enabled
             self.render_toggle_states()
-        except subprocess.CalledProcessError: 
+        except subprocess.CalledProcessError:
             pass
         except FileNotFoundError:
             pass
@@ -366,21 +432,21 @@ class CyberDeck(QWidget):
             self.is_volume_muted = not self.is_volume_muted
             self.render_toggle_states()
             self.vol_slider.setValue(self.get_volume())
-        except subprocess.CalledProcessError: 
+        except subprocess.CalledProcessError:
             pass
         except FileNotFoundError:
             pass
 
     def get_volume(self):
         try:
-            out = subprocess.run(["pactl", "get-sink-volume", "@DEFAULT_SINK@"], 
+            out = subprocess.run(["pactl", "get-sink-volume", "@DEFAULT_SINK@"],
                                  capture_output=True, text=True, check=True).stdout
             for line in out.splitlines():
                 if "Volume:" in line:
                     pct_str = line.split("/")[1].strip().split(" ")[0].replace("%", "")
                     return int(pct_str)
-        except: 
-            return 50 
+        except:
+            return 50
 
     def set_volume(self, val):
         try:
@@ -389,7 +455,25 @@ class CyberDeck(QWidget):
                 subprocess.run(["pactl", "set-sink-mute", "@DEFAULT_SINK@", "0"], check=True)
                 self.is_volume_muted = False
                 self.render_toggle_states()
-        except: 
+        except:
+            pass
+
+    def get_brightness(self):
+        try:
+            current = subprocess.run(["brightnessctl", "g"], capture_output=True, text=True, check=True).stdout.strip()
+            maximum = subprocess.run(["brightnessctl", "m"], capture_output=True, text=True, check=True).stdout.strip()
+            current_val = int(current)
+            max_val = int(maximum)
+            if max_val == 0:
+                return 50
+            return round((current_val / max_val) * 100)
+        except:
+            return 50
+
+    def set_brightness(self, val):
+        try:
+            subprocess.run(["brightnessctl", "s", f"{val}%"], check=True)
+        except:
             pass
 
     def toggle_visibility(self):
@@ -426,7 +510,8 @@ if __name__ == "__main__":
     try:
         QFont.insertSubstitute("OCR A", "monospace")
     except:
-        pass 
+        pass
     deck = CyberDeck()
+    deck.setFixedSize(400,700)
     deck.show()
     sys.exit(app.exec())
