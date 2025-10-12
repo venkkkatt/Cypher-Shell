@@ -17,11 +17,12 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 DEFAULT_CONFIG = {
     "theme": "dark",
     "accent": "#00FFFF",
+    "general_accent": "#005555",
     "last_brightness": 60,
     "last_volume": 80,
     "ui_opacity": 95,
     "general_font": "JetBrains Mono",
-    "display_font": "VT323"
+    "display_font": "VT323",
 }
 
 FONT_GENERAL = "JetBrains Mono"
@@ -33,23 +34,44 @@ def get_available_fonts():
     except Exception:
         return ["Monospace", "Arial", "Courier New"]
 
+def save_config(config):
+    try:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config, f, indent=4)
+        return True
+    except Exception as e:
+        print(f"Error saving config to {CONFIG_FILE}: {e}", file=sys.stderr)
+        return False
+
 def load_config():
     cfg = DEFAULT_CONFIG.copy()
+    
     try:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        if CONFIG_FILE.exists():
-            loaded_cfg = json.loads(CONFIG_FILE.read_text())
-            cfg.update(loaded_cfg)
-    except Exception:
-        pass
-    return cfg
+    except Exception as e:
+        print(f"Error creating config directory {CONFIG_DIR}: {e}", file=sys.stderr)
+        return cfg 
 
-def save_config(cfg):
-    try:
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        CONFIG_FILE.write_text(json.dumps(cfg, indent=2))
-    except Exception:
-        pass
+    if CONFIG_FILE.is_file():
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                loaded_config = json.load(f)
+                for key in loaded_config:
+                    if key in cfg:
+                        cfg[key] = loaded_config[key]
+        except json.JSONDecodeError as e:
+            print(f"Warning: Config file {CONFIG_FILE} is corrupted. Resetting to default. Error: {e}", file=sys.stderr)
+            save_config(cfg)
+        except Exception as e:
+            print(f"Error loading config file {CONFIG_FILE}: {e}", file=sys.stderr)
+            save_config(cfg)
+    else:
+        print(f"Config file not found at {CONFIG_FILE}. Creating default.", file=sys.stderr)
+        save_config(cfg)
+            
+    return cfg
 
 def get_brightness_brightnessctl():
     try:
@@ -278,6 +300,7 @@ class SystemPage(QWidget):
         if self.update_counter % 5 == 0:
             self.uptime_lbl.set_value(self.get_uptime())
 
+
 class PersonalizationPage(QWidget):
     def __init__(self, parent):
         super().__init__()
@@ -288,9 +311,15 @@ class PersonalizationPage(QWidget):
         btn = QPushButton(":: TOGGLE DARK / LIGHT THEME ::")
         btn.clicked.connect(self.toggle_theme)
         theme.body.addWidget(btn)
-        color_btn = QPushButton(":: SELECT NEON ACCENT HUE ::")
+        
+        color_btn = QPushButton(":: SELECT PRIMARY ACCENT HUE (High Contrast) ::")
         color_btn.clicked.connect(self.pick_color)
         theme.body.addWidget(color_btn)
+        
+        general_accent_btn = QPushButton(":: SELECT GENERAL ACCENT HUE (Subdued) ::")
+        general_accent_btn.clicked.connect(self.pick_general_accent)
+        theme.body.addWidget(general_accent_btn)
+        
         opacity_card = QWidget()
         opacity_layout = QHBoxLayout(opacity_card)
         opacity_layout.setContentsMargins(0, 0, 0, 0)
@@ -307,6 +336,7 @@ class PersonalizationPage(QWidget):
         opacity_layout.addWidget(self.opacity_slider, alignment=Qt.AlignRight)
         theme.body.addWidget(opacity_card)
         v.addWidget(theme)
+        
         font_card = Card("TYPOGRAPHY MATRIX", "Select system and display fonts")
         available_fonts = get_available_fonts()
         general_font_layout = QHBoxLayout()
@@ -326,6 +356,7 @@ class PersonalizationPage(QWidget):
         display_font_layout.addWidget(display_font_combo)
         font_card.body.addLayout(display_font_layout)
         v.addWidget(font_card)
+        
         bright = Card("DISPLAY LUMINANCE", "Adjust screen brightness level")
         def get_current_brightness_percent():
             percent = get_brightness_brightnessctl()
@@ -351,10 +382,19 @@ class PersonalizationPage(QWidget):
         self.parent.apply_styles()
 
     def pick_color(self):
-        col = QColorDialog.getColor(QColor(self.parent.cfg.get("accent", DEFAULT_CONFIG['accent'])), self, "Select Neon Hue")
+        col = QColorDialog.getColor(QColor(self.parent.cfg.get("accent", DEFAULT_CONFIG['accent'])), self, "Select Primary Accent Hue")
         if col.isValid():
             self.parent.cfg["accent"] = col.name()
             save_config(self.parent.cfg)
+            self.parent.apply_styles()
+
+    def pick_general_accent(self):
+        cfg = self.parent.cfg
+        current_color = cfg.get("general_accent", DEFAULT_CONFIG['general_accent'])
+        col = QColorDialog.getColor(QColor(current_color), self, "Select General/Subdued Accent Hue")
+        if col.isValid():
+            cfg["general_accent"] = col.name()
+            save_config(cfg)
             self.parent.apply_styles()
 
     def set_opacity(self):
@@ -382,7 +422,7 @@ class PersonalizationPage(QWidget):
             save_config(cfg)
         else:
             QMessageBox.critical(self, "Luminance Control Failure",
-                                f"Failed to set brightness to {val}%.\n\nReason: {msg}")
+                                f"Failed to set brightness to {val}%\n\nReason: {msg}")
             self.slider.setValue(load_config().get("last_brightness", DEFAULT_CONFIG['last_brightness']))
 
 class AudioPage(QWidget):
@@ -841,9 +881,9 @@ class UtilityPage(QWidget):
         
         self.app_list = [
             ("TERMINAL", "alacritty", "#00FF00"),
-            ("FILE MANAGER", "thunar", "#00FFFF"),
+            ("FILE MANAGER", "cypher-vault", "#00FFFF"),
             ("WEB BROWSER", "firefox", "#FFD700"),
-            ("TEXT EDITOR", "nvim", "#FF66CC"),
+            ("TEXT EDITOR", "vi", "#FF66CC"),
         ]
         
         for i, (label, command, color) in enumerate(self.app_list):
@@ -919,7 +959,6 @@ class PowerPage(QWidget):
                 msg_box.setIcon(QMessageBox.Critical)
                 msg_box.exec_()
 
-
 class SynapseApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -954,10 +993,9 @@ class SynapseApp(QMainWindow):
         layout.addWidget(self.stack_frame, 1)
 
         self.pages = [
-            SystemPage(), PersonalizationPage(self), AudioPage(), ChronoPage(),
+            ChronoPage(), SystemPage(), PersonalizationPage(self), AudioPage(), HyprlandPage(),
             NetworkPage(), ProcessPage(), UtilityPage(), PowerPage(),
             ConfigPage(self), 
-            HyprlandPage(),
         ]
         for p in self.pages:
             sa = QScrollArea()
@@ -973,16 +1011,17 @@ class SynapseApp(QMainWindow):
         self.menu.setObjectName("MenuWidget")
         
         menu_items = [
-            "SYSTEM", 
+            "TIME",
+            "SYSTEM",
             "VISUALS", 
             "AUDIO", 
-            "TIME",
+            "WINDOWS",
             "NETWORK", 
             "PROCESSES", 
             "UTILITIES",   
             "POWER", 
             "CORE", 
-            "WINDOWS",
+            
         ]
         
         for name in menu_items:
@@ -1013,6 +1052,8 @@ class SynapseApp(QMainWindow):
 
     def apply_styles(self):
         accent = self.cfg.get("accent", DEFAULT_CONFIG['accent'])
+        general_accent = self.cfg.get("general_accent", DEFAULT_CONFIG['general_accent'])
+        
         theme = self.cfg.get("theme", "dark")
         opacity_percent = self.cfg.get("ui_opacity", DEFAULT_CONFIG['ui_opacity'])
         opacity = float(opacity_percent) / 100.0
@@ -1023,7 +1064,7 @@ class SynapseApp(QMainWindow):
 
         if theme == "light":
             BG_MAIN = "#f7f7f7"
-            FG_PRIMARY = "#102020"
+            FG_PRIMARY = "#102020" 
             BG_CARD = "#ffffff"
         else:
             BG_MAIN = "#0a0f0a"
@@ -1034,7 +1075,7 @@ class SynapseApp(QMainWindow):
         * {{
             font-family: '{general_font}', 'Consolas', monospace;
             font-size: 10pt;
-            color: {FG_PRIMARY};
+            color: {FG_PRIMARY}; 
             outline: none;
         }}
         
@@ -1054,7 +1095,7 @@ class SynapseApp(QMainWindow):
 
         QFrame#Card {{
             background: {BG_CARD};
-            border: 1px solid {accent}1A;
+            border: 1px solid {general_accent}40;
             border-radius: 8px; 
             margin-bottom: 20px;
         }}
@@ -1069,7 +1110,7 @@ class SynapseApp(QMainWindow):
         
         #CardSubtitle {{
             font-size: 9pt;
-            color: {accent}A0;
+            color: {general_accent}A0;
             font-style: italic;
         }}
 
@@ -1079,8 +1120,8 @@ class SynapseApp(QMainWindow):
         }}
         
         QListWidget {{
-            background-color: rgba(0,0,0,0.25);
-            border: 1px solid {accent}40;
+            background-color: {BG_MAIN}50;
+            border: 1px solid {general_accent}70;
             border-radius: 8px;
         }}
         
@@ -1091,7 +1132,7 @@ class SynapseApp(QMainWindow):
         }}
         
         QListWidget::item:hover {{
-            background: {accent}10;
+            background: {general_accent}40;
         }}
         
         QListWidget::item:selected {{
@@ -1105,7 +1146,7 @@ class SynapseApp(QMainWindow):
             font-family: '{display_font}', monospace;
             font-size: 64pt;
             font-weight: bold;
-            color: {accent}; 
+            color: {accent};
             text-align: center;
             padding: 10px 0;
             text-shadow: 0 0 8px {accent}AA;
@@ -1115,25 +1156,25 @@ class SynapseApp(QMainWindow):
             font-family: '{general_font}', monospace;
             font-size: 14pt;
             font-weight: 500;
-            color: {accent}B0;
+            color: {general_accent}B0;
             text-align: center;
             padding-bottom: 10px;
         }}
         
         .stat-label {{
-            color: {accent}A0; 
+            color: {general_accent}A0;
             font-weight: normal;
         }}
         
         .stat-value {{
-            color: {FG_PRIMARY};
+            color: {FG_PRIMARY}; 
             font-weight: 500;
         }}
         
         QPushButton {{
-            background: {accent}20; 
+            background: {general_accent}20;
             color: {accent};
-            border: 1px solid {accent}70;
+            border: 1px solid {general_accent}70;
             border-radius: 4px;
             padding: 10px 15px;
             text-transform: uppercase;
@@ -1141,13 +1182,13 @@ class SynapseApp(QMainWindow):
         }}
         
         QPushButton:hover {{
-            background: {accent}40;
+            background: {general_accent}40;
             color: {FG_PRIMARY};
             border: 1px solid {accent};
         }}
         
         QSlider::groove:horizontal {{
-            border: 1px solid {accent}70;
+            border: 1px solid {general_accent}70;
             height: 8px; 
             background: {BG_MAIN}40;
             border-radius: 4px;
@@ -1155,7 +1196,7 @@ class SynapseApp(QMainWindow):
         
         QSlider::handle:horizontal {{
             background: {accent};
-            border: 2px solid {FG_PRIMARY};
+            border: 2px solid {general_accent};
             width: 20px;
             margin: -7px 0;
             border-radius: 10px;
@@ -1168,7 +1209,7 @@ class SynapseApp(QMainWindow):
 
         QComboBox, QSpinBox {{
             background: {BG_MAIN}80;
-            border: 1px solid {accent}70;
+            border: 1px solid {general_accent}70;
             border-radius: 4px;
             padding: 5px;
             min-height: 25px; 
@@ -1182,7 +1223,7 @@ class SynapseApp(QMainWindow):
         
         QTextEdit#ConfigEditor, QLineEdit#CommandInput {{
             background: {BG_MAIN}80;
-            border: 1px solid {accent}70;
+            border: 1px solid {general_accent}70;
             border-radius: 4px;
             padding: 8px;
             font-family: monospace;
@@ -1192,15 +1233,15 @@ class SynapseApp(QMainWindow):
         QComboBox QAbstractItemView {{
             border: 1px solid {accent};
             background-color: {BG_MAIN};
-            selection-background-color: {accent}60;
+            selection-background-color: {general_accent}60;
             selection-color: {BG_CARD};
             padding: 5px;
         }}
 
         QTableWidget {{
             background-color: {BG_MAIN}80;
-            border: 1px solid {accent}70;
-            gridline-color: {accent}30;
+            border: 1px solid {general_accent}70;
+            gridline-color: {general_accent}30;
             selection-background-color: {accent}80;
             selection-color: #051010;
         }}
@@ -1208,7 +1249,7 @@ class SynapseApp(QMainWindow):
         QHeaderView::section {{
             background-color: {BG_MAIN};
             color: {accent};
-            border: 1px solid {accent}50;
+            border: 1px solid {general_accent}50;
             padding: 8px;
             font-weight: bold;
         }}
