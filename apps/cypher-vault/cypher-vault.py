@@ -28,10 +28,10 @@ DEFAULT_CONFIG = {
     "colors": {
         "background": "#0B0F14",
         "panel": "#0E1620",
-        "accent": "#FE85BB", 
+        "accent": "#AFFE85", 
         "muted": "#9AA3B2",
         "panel_alt": "#101521",
-        "highlight": "#FF00DD",
+        "highlight": "#6FFF00",
         "file_bg": "#0C1116",
         "text": "#E6EEF3",
         "separator": "#3A404A"
@@ -232,6 +232,7 @@ class FileManagerWindow(QMainWindow):
         self.clipboard_buffer = []
         self.current_root = QDir.homePath()
         self.style = QApplication.instance().style()
+        self._trash_path = str(Path.home() / '.local' / 'share' / 'Trash' / 'files')
 
         self.setStyleSheet(stylesheet_from_config(self.cfg))
 
@@ -332,7 +333,7 @@ class FileManagerWindow(QMainWindow):
         paste_act.triggered.connect(self.paste_clipboard)
         toolbar.addAction(paste_act)
 
-        delete_act = QAction(self.style.standardIcon(QStyle.StandardPixmap.SP_DialogCloseButton), "Delete", self)
+        delete_act = QAction(self.style.standardIcon(QStyle.StandardPixmap.SP_DialogCloseButton), "Delete / Move to Trash", self)
         delete_act.setShortcut(QKeySequence.StandardKey.Delete)
         delete_act.triggered.connect(self.delete_selected)
         toolbar.addAction(delete_act)
@@ -417,7 +418,7 @@ class FileManagerWindow(QMainWindow):
 
     def path_for_sidebar(self, name):
         home = Path.home() 
-        trash_path = home / '.local' / 'share' / 'Trash' / 'files'
+        trash_path = Path(self._trash_path) 
         mapping = {
             "Home": home,
             "Documents": home / "Documents",
@@ -559,19 +560,33 @@ class FileManagerWindow(QMainWindow):
                 menu.addAction(self.style.standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView), "Paste", self.paste_clipboard)
             menu.exec(self.tree.viewport().mapToGlobal(pos))
             return
+        
         source_index = self.proxy.mapToSource(idx)
         path = self.model.filePath(source_index)
         menu = QMenu(self)
+        
         menu.addAction("Open", lambda: self._open_path(path))
         menu.addAction("Open in Native File Manager", lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.dirname(path))))
         menu.addSeparator()
+        
         menu.addAction("Copy", lambda: self._copy_to_clipboard([path], is_cut=False))
         menu.addAction("Cut", lambda: self._copy_to_clipboard([path], is_cut=True))
         if self.clipboard_buffer:
              menu.addAction("Paste", self.paste_clipboard)
         menu.addSeparator()
+        
         menu.addAction("Rename", lambda: self._rename(path))
-        menu.addAction("Delete", lambda: self._delete([path]))
+        
+        trash_path = Path(self._trash_path).absolute()
+        is_in_trash = Path(self.current_root).absolute() == trash_path
+        
+        if is_in_trash:
+             menu.addAction("Permanent Delete", lambda: self._permanent_delete([path]))
+        elif HAS_SEND2TRASH:
+             menu.addAction("Move to Trash", lambda: self._delete([path]))
+        else:
+             menu.addAction("Delete (Permanent)", lambda: self._delete([path]))
+             
         menu.addSeparator()
         menu.addAction("Properties", lambda: self._show_properties(path))
         menu.exec(self.tree.viewport().mapToGlobal(pos))
@@ -632,20 +647,62 @@ class FileManagerWindow(QMainWindow):
             if proxy_index.column() == 0: 
                 source_index = self.proxy.mapToSource(proxy_index)
                 paths.append(self.model.filePath(source_index))
-        self._delete(paths)
+        
+        trash_path = Path(self._trash_path).absolute()
+        is_in_trash = Path(self.current_root).absolute() == trash_path
+        
+        if is_in_trash:
+            self._permanent_delete(paths) 
+        else:
+            self._delete(paths)
+            
+    def _permanent_delete(self, paths):
+        """Permanently deletes the given paths using os/shutil."""
+        if not paths:
+            return
+        
+        names = "\n".join(Path(p).name for p in paths)
+        question_text = f"PERMANENTLY DELETE the following {len(paths)} item(s)?\n{names}\n\nTHIS ACTION CANNOT BE UNDONE."
+        
+        sure = QMessageBox.question(self, "Permanent Delete Confirmation", question_text, 
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if sure != QMessageBox.StandardButton.Yes:
+            return
+        
+        failed = []
+        for p in paths:
+            try:
+                p_path = Path(p)
+                if p_path.is_dir():
+                    shutil.rmtree(p) 
+                else:
+                    os.remove(p)
+            except Exception as e:
+                failed.append((p, str(e)))
+        
+        self.refresh()
+        if failed:
+            msg = "\n".join(f"{Path(p).name}: {err}" for p, err in failed)
+            QMessageBox.warning(self, "Partial Failure", f"Some items failed to permanently delete:\n{msg}")
+        else:
+            self.status.showMessage("Permanent Delete complete", 3000)
 
     def _delete(self, paths):
+        """Moves selected paths to trash (if available) or permanently deletes as fallback."""
         if not paths:
             return
         names = "\n".join(Path(p).name for p in paths)
+        
         if HAS_SEND2TRASH:
              question_text = f"Move the following {len(paths)} item(s) to Trash?\n{names}"
         else:
              question_text = f"PERMANENTLY DELETE the following {len(paths)} item(s)?\n{names}\n\n(Install 'send2trash' for safer deletion)"
+        
         sure = QMessageBox.question(self, "Delete Confirmation", question_text, 
                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if sure != QMessageBox.StandardButton.Yes:
             return
+            
         failed = []
         for p in paths:
             try:
@@ -739,7 +796,7 @@ class FileManagerWindow(QMainWindow):
         self.refresh()
         if failed:
             msg = "\n".join(f"{Path(p).name}: {e}" for p, e in failed)
-            QMessageBox.warning(self, "Partial Failure", f"Some items failed to paste:\\n{msg}")
+            QMessageBox.warning(self, "Partial Failure", f"Some items failed to paste:\n{msg}")
         else:
             self.status.showMessage("Paste complete", 3000)
 
