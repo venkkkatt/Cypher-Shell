@@ -8,8 +8,7 @@ The Graphical Shell of Cypher.
 
 <img width="2880" height="1800" alt="screenshot-20251016-185837" src="https://github.com/user-attachments/assets/408ba322-4a47-4407-8106-976012fe3031" />
 
-<img width="2880" height="1800" alt="screenshot-20251016-190022" src="https://github.com/user-attachments/assets/6cda5e76-43fc-423d-b2a1-ba24dc51324b" />
-
+<img width="2880" height="1800" alt="screenshot-20251016-185901" src="https://github.com/user-attachments/assets/0965e624-4039-41ac-8dbf-17fee23584e5" />
 
 Cypher's ecosystem is built using PyQt5 and Python. It consists of Filemanager, Settings, Taskbar, Terminal, Menubar and system widgets. It takes leverage of Hyprland for low-level window management.
 
