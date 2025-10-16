@@ -1,4 +1,6 @@
-<img width="2870" height="1800" alt="screenshot-20251016-185738" src="https://github.com/user-attachments/assets/8c11da88-624f-4162-89dd-c0b57d839304" />The Graphical Shell of Cypher.
+The Graphical Shell of Cypher.
+
+<img width="2870" height="1800" alt="screenshot-20251016-185738" src="https://github.com/user-attachments/assets/8c11da88-624f-4162-89dd-c0b57d839304" />
 
 <img width="2880" height="1800" alt="screenshot-20251015-095155" src="https://github.com/user-attachments/assets/13689a39-0a03-46cc-ac02-7746fcfbfd94" />
 
