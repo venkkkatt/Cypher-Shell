@@ -47,7 +47,7 @@ def initialize_taskbar():
     leftLayout.setSpacing(10)
     left.setLayout(leftLayout)
     
-    cydeck_button = QPushButton("CYDECK")
+    cydeck_button = QPushButton("CYPHER")
     cydeck_button.setFont(QFont("OCR A", 10))
     cydeck_button.setFixedSize(70, 35)
 

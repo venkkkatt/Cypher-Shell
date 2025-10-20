@@ -306,7 +306,7 @@ class CyberDeck(QWidget):
         pass
 
     def launch_file_manager(self):
-        fm_commands = ["/usr/local/bin/cypher-vault-dir/cypher-vault","nautilus", "dolphin", "thunar", "pcmanfm"]
+        fm_commands = ["/usr/local/bin/cypher-vault","nautilus", "dolphin", "thunar", "pcmanfm"]
         for cmd in fm_commands:
             try:
                 subprocess.Popen([cmd])

@@ -9,7 +9,10 @@ try:
 except Exception:
     HAS_SEND2TRASH = False
 
-from PyQt6.QtCore import Qt, QDir, QUrl, QSortFilterProxyModel, QSize
+from PyQt6.QtCore import (
+    Qt, QDir, QUrl, QSortFilterProxyModel, QSize, QObject, QRunnable, 
+    pyqtSignal, QThreadPool, QRegularExpression, QModelIndex
+)
 from PyQt6.QtGui import QIcon, QAction, QKeySequence, QDesktopServices, QPixmap, QFileSystemModel, QColor
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QTreeView, QListWidget, QListWidgetItem,
@@ -28,10 +31,10 @@ DEFAULT_CONFIG = {
     "colors": {
         "background": "#0B0F14",
         "panel": "#0E1620",
-        "accent": "#AFFE85", 
+        "accent": "#FE85BB", 
         "muted": "#9AA3B2",
         "panel_alt": "#101521",
-        "highlight": "#6FFF00",
+        "highlight": "#FF00DD",
         "file_bg": "#0C1116",
         "text": "#E6EEF3",
         "separator": "#3A404A"
@@ -48,7 +51,6 @@ def load_config():
         try:
             APP_DIR.mkdir(parents=True, exist_ok=True)
         except Exception:
-            print(f"Warning: Could not create config directory {APP_DIR}. Using default settings.")
             return DEFAULT_CONFIG.copy()
 
     if not CONFIG_FILE.exists():
@@ -109,7 +111,6 @@ def stylesheet_from_config(cfg: dict) -> str:
     
     QTreeView::item:selected {{
         color: {contrasting_text_color};
-        /* Ensure background is covered by the QTreeView rule above */
         background-color: {c['accent']};
     }}
     
@@ -223,6 +224,79 @@ class PropertiesDialog(QDialog):
                 perms_str.append('x' if (mode >> (8-i) & 1) else '-')
         return is_dir + "".join(perms_str)
 
+class WorkerSignals(QObject):
+    finished = pyqtSignal(list, bool)
+    progress = pyqtSignal(int, str)
+
+class FileWorker(QRunnable):
+    def __init__(self, clipboard_buffer, dest_dir):
+        super().__init__()
+        self.clipboard_buffer = clipboard_buffer
+        self.dest_dir = dest_dir
+        self.signals = WorkerSignals()
+
+    def run(self):
+        failed = []
+        
+        for i, (src, is_cut_item) in enumerate(self.clipboard_buffer):
+            src_path = Path(src)
+            basename = src_path.name
+            dst = self.dest_dir / basename
+            
+            self.signals.progress.emit(i + 1, basename)
+
+            try:
+                if is_cut_item:
+                    shutil.move(src, dst) 
+                else:
+                    if src_path.is_dir():
+                        shutil.copytree(src, dst) 
+                    else:
+                        shutil.copy2(src, dst) 
+            except Exception as e:
+                failed.append((src, str(e)))
+                
+        is_cut = any(c[1] for c in self.clipboard_buffer)
+        self.signals.finished.emit(failed, is_cut)
+
+class FileFilterProxyModel(QSortFilterProxyModel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFilterKeyColumn(0)
+
+    def filterAcceptsRow(self, source_row, source_parent):
+        source_model = self.sourceModel()
+        source_index = source_model.index(source_row, self.filterKeyColumn(), source_parent)
+        
+        if not source_index.isValid():
+            return False
+
+        if super().filterAcceptsRow(source_row, source_parent):
+            return True
+        
+        if source_model.isDir(source_index):
+            return self._filterAcceptsChildren(source_index)
+                
+        return False
+
+    def _filterAcceptsChildren(self, parent_index: QModelIndex):
+        source_model = self.sourceModel()
+        
+        for i in range(source_model.rowCount(parent_index)):
+            child_index = source_model.index(i, self.filterKeyColumn(), parent_index)
+            
+            if not child_index.isValid():
+                continue
+                
+            if super().filterAcceptsRow(i, parent_index):
+                return True 
+                
+            if source_model.isDir(child_index):
+                if self._filterAcceptsChildren(child_index):
+                    return True
+                    
+        return False
+
 class FileManagerWindow(QMainWindow):
     def __init__(self, config):
         super().__init__()
@@ -232,7 +306,9 @@ class FileManagerWindow(QMainWindow):
         self.clipboard_buffer = []
         self.current_root = QDir.homePath()
         self.style = QApplication.instance().style()
+        self.threadpool = QThreadPool()
         self._trash_path = str(Path.home() / '.local' / 'share' / 'Trash' / 'files')
+        self.progress_dialog = None
 
         self.setStyleSheet(stylesheet_from_config(self.cfg))
 
@@ -242,8 +318,9 @@ class FileManagerWindow(QMainWindow):
         self.model.setResolveSymlinks(True) 
         self.model.setFilter(QDir.Filter.AllEntries | QDir.Filter.AllDirs | QDir.Filter.NoDotAndDotDot) 
 
-        self.proxy = QSortFilterProxyModel()
+        self.proxy = FileFilterProxyModel()
         self.proxy.setSourceModel(self.model)
+        self.proxy.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive) 
         
         self.tree = QTreeView()
         self.tree.setModel(self.proxy)
@@ -292,8 +369,10 @@ class FileManagerWindow(QMainWindow):
         pv_layout.addWidget(self.preview_text)
 
         self.search_bar = QLineEdit()
-        self.search_bar.setPlaceholderText("Search (type then press Enter)")
-        self.search_bar.returnPressed.connect(self.on_search)
+        self.search_bar.setPlaceholderText("Search (Path/Name, press Enter or just type to filter)")
+        self.search_bar.returnPressed.connect(self.on_search) 
+        self.search_bar.textChanged.connect(self.on_search_filter) 
+
 
         toolbar = QToolBar()
         toolbar.setIconSize(QSize(24, 24))
@@ -410,15 +489,9 @@ class FileManagerWindow(QMainWindow):
         
         return style.standardIcon(pixmap_class.SP_DirIcon)
 
-    def on_sidebar_click(self, item):
-        name = item.text()
-        path = self.path_for_sidebar(name)
-        if path and Path(path).exists():
-            self.set_root(path)
-
     def path_for_sidebar(self, name):
         home = Path.home() 
-        trash_path = Path(self._trash_path) 
+        trash_path = Path(self._trash_path)
         mapping = {
             "Home": home,
             "Documents": home / "Documents",
@@ -435,9 +508,16 @@ class FileManagerWindow(QMainWindow):
                     trash_path.mkdir(parents=True, exist_ok=True)
                     (home / '.local' / 'share' / 'Trash' / 'info').mkdir(parents=True, exist_ok=True)
                 except Exception:
-                    QMessageBox.warning(self, "Error", "Could not create standard Trash directory.")
+                    QMessageBox.warning(self, "Error", "Could not create standard Trash directory. Falling back to Home.")
                     return str(home)
         return str(mapping.get(name, home)) 
+
+    def on_sidebar_click(self, item):
+        name = item.text()
+        path = self.path_for_sidebar(name)
+        if path and Path(path).exists():
+            self.set_root(path)
+            self.search_bar.clear() 
 
     def set_root(self, path):
         if not Path(path).exists() or not Path(path).is_dir():
@@ -472,31 +552,76 @@ class FileManagerWindow(QMainWindow):
         path = self.model.filePath(source_index)
         self._open_path(path) 
 
-    def on_search(self):
-        txt = self.search_bar.text().strip()
-        if not txt:
-            self.model.setNameFilters([]) 
-            self.model.setFilter(QDir.Filter.AllEntries | QDir.Filter.AllDirs | QDir.Filter.NoDotAndDotDot)
-            self.status.showMessage(f"Filter cleared.", 2000)
+    def on_search_filter(self, query):
+        if not query:
+            self.proxy.setFilterRegularExpression(QRegularExpression())
+            self.status.showMessage(f"Showing all items in {self.current_root}", 3000)
             return
-        filter_pattern = f"*{txt}*"
-        self.model.setFilter(QDir.Filter.AllEntries | QDir.Filter.AllDirs) 
-        self.model.setNameFilters([filter_pattern])
-        root_index = self.tree.rootIndex()
-        match_index = None
-        for row in range(self.proxy.rowCount(root_index)):
-            proxy_index = self.proxy.index(row, 0, root_index)
-            source_index = self.proxy.mapToSource(proxy_index)
-            file_name = self.model.fileName(source_index)
-            if txt.lower() in file_name.lower():
-                match_index = proxy_index
-                break
-        if match_index:
-             self.tree.setCurrentIndex(match_index)
-             self.tree.scrollTo(match_index, self.tree.ScrollHint.EnsureVisible)
-             self.status.showMessage(f"Found and scrolled to '{self.model.fileName(self.proxy.mapToSource(match_index))}'", 3000)
-        else:
-            self.status.showMessage(f"No items found matching '{txt}'", 3000)
+
+        wildcard_query = f"*{query}*"
+        
+        regex = QRegularExpression.fromWildcard(
+            wildcard_query,
+            Qt.CaseSensitivity.CaseInsensitive
+        )
+        
+        self.proxy.setFilterRegularExpression(regex)
+        
+        if self.proxy.rowCount() == 0:
+            self.status.showMessage(f"No match found for '{query}' in {self.current_root}", 3000)
+
+    def on_search(self):
+        query = self.search_bar.text().strip()
+        if not query:
+            return
+
+        p = Path(query)
+        is_absolute_path_query = p.is_absolute() or query.startswith('~')
+
+        if is_absolute_path_query:
+            if query.startswith('~'):
+                p = Path(query).expanduser()
+            
+            try:
+                p = p.resolve(strict=True) 
+            except FileNotFoundError:
+                QMessageBox.warning(self, "Path Not Found", f"No file or directory exists at:\n{query}")
+                return
+            except Exception as e:
+                QMessageBox.warning(self, "Path Error", f"Cannot access or resolve path: {type(e).__name__}\n{query}")
+                return
+
+            if p.exists():
+                if p.is_file():
+                    parent_dir = str(p.parent)
+                    target_path = str(p)
+                elif p.is_dir():
+                    parent_dir = str(p)
+                    target_path = str(p)
+                else:
+                    QMessageBox.information(self, "Path Info", f"Path exists but is not a regular file or directory (e.g., link, socket):\n{query}")
+                    return
+
+                self.proxy.setFilterRegularExpression(QRegularExpression())
+                
+                self.set_root(parent_dir)
+                
+                if p.is_file():
+                    src_idx = self.model.index(target_path)
+                    proxy_idx = self.proxy.mapFromSource(src_idx)
+                    if proxy_idx.isValid():
+                        self.tree.scrollTo(proxy_idx, self.tree.ScrollHint.PositionAtCenter)
+                        self.tree.setCurrentIndex(proxy_idx)
+                        self.tree.selectionModel().select(proxy_idx, self.tree.SelectionFlag.ClearAndSelect)
+                        self.status.showMessage(f"Navigated to file: {target_path}", 5000)
+                else:
+                    self.status.showMessage(f"Navigated to directory: {target_path}", 5000)
+                
+                self.search_bar.clear()
+                return
+        
+        self.on_search_filter(query)
+
 
     def on_selection_changed(self, selected, deselected):
         sel = self.tree.selectionModel().selectedIndexes()
@@ -505,10 +630,14 @@ class FileManagerWindow(QMainWindow):
             self.preview_text.hide()
             self.preview_area.setText("Select a file or folder to preview.")
             return
-        proxy_index = sel[0]
-        source_index = self.proxy.mapToSource(proxy_index)
-        path = self.model.filePath(source_index)
-        self._preview_path(path)
+            
+        paths = self._get_selected_paths()
+        if paths:
+            self._preview_path(paths[0])
+        else:
+            self.preview_area.show()
+            self.preview_text.hide()
+            self.preview_area.setText("Select a file or folder to preview.")
 
     def _preview_path(self, path):
         self.preview_text.hide()
@@ -577,28 +706,26 @@ class FileManagerWindow(QMainWindow):
         
         menu.addAction("Rename", lambda: self._rename(path))
         
+        paths = [path]
         trash_path = Path(self._trash_path).absolute()
         is_in_trash = Path(self.current_root).absolute() == trash_path
         
         if is_in_trash:
-             menu.addAction("Permanent Delete", lambda: self._permanent_delete([path]))
+             menu.addAction("Permanent Delete", lambda: self._permanent_delete(paths))
         elif HAS_SEND2TRASH:
-             menu.addAction("Move to Trash", lambda: self._delete([path]))
+             menu.addAction("Move to Trash", lambda: self._delete(paths))
         else:
-             menu.addAction("Delete (Permanent)", lambda: self._delete([path]))
+             menu.addAction("Delete (Permanent)", lambda: self._delete(paths))
              
         menu.addSeparator()
         menu.addAction("Properties", lambda: self._show_properties(path))
         menu.exec(self.tree.viewport().mapToGlobal(pos))
 
     def open_selected(self):
-        sel = self.tree.selectionModel().selectedIndexes()
-        if not sel:
+        paths = self._get_selected_paths()
+        if not paths:
             return
-        proxy_index = sel[0] 
-        source_index = self.proxy.mapToSource(proxy_index)
-        path = self.model.filePath(source_index)
-        self._open_path(path)
+        self._open_path(paths[0])
 
     def _open_path(self, path):
         if Path(path).is_dir():
@@ -638,26 +765,28 @@ class FileManagerWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Rename failed: {type(e).__name__}: {e}")
 
-    def delete_selected(self):
-        sel = self.tree.selectionModel().selectedIndexes()
-        if not sel:
-            return
-        paths = []
-        for proxy_index in sel:
+    def _get_selected_paths(self):
+        paths = set()
+        for proxy_index in self.tree.selectionModel().selectedIndexes():
             if proxy_index.column() == 0: 
                 source_index = self.proxy.mapToSource(proxy_index)
-                paths.append(self.model.filePath(source_index))
+                paths.add(self.model.filePath(source_index))
+        return list(paths)
+
+    def delete_selected(self):
+        paths = self._get_selected_paths()
+        if not paths:
+            return
         
         trash_path = Path(self._trash_path).absolute()
         is_in_trash = Path(self.current_root).absolute() == trash_path
         
         if is_in_trash:
-            self._permanent_delete(paths) 
+            self._permanent_delete(paths)
         else:
             self._delete(paths)
             
     def _permanent_delete(self, paths):
-        """Permanently deletes the given paths using os/shutil."""
         if not paths:
             return
         
@@ -688,7 +817,6 @@ class FileManagerWindow(QMainWindow):
             self.status.showMessage("Permanent Delete complete", 3000)
 
     def _delete(self, paths):
-        """Moves selected paths to trash (if available) or permanently deletes as fallback."""
         if not paths:
             return
         names = "\n".join(Path(p).name for p in paths)
@@ -727,20 +855,10 @@ class FileManagerWindow(QMainWindow):
         dlg.exec()
 
     def show_properties(self):
-        sel = self.tree.selectionModel().selectedIndexes()
-        if not sel:
+        paths = self._get_selected_paths()
+        if not paths:
             return
-        source_index = self.proxy.mapToSource(sel[0])
-        path = self.model.filePath(source_index)
-        self._show_properties(path)
-
-    def _get_selected_paths(self):
-        paths = []
-        for proxy_index in self.tree.selectionModel().selectedIndexes():
-            if proxy_index.column() == 0: 
-                source_index = self.proxy.mapToSource(proxy_index)
-                paths.append(self.model.filePath(source_index))
-        return paths
+        self._show_properties(paths[0])
 
     def copy_selected(self):
         paths = self._get_selected_paths()
@@ -765,35 +883,37 @@ class FileManagerWindow(QMainWindow):
         if not self.clipboard_buffer:
             QMessageBox.information(self, "Paste", "Clipboard is empty.")
             return
+            
         dest_dir = Path(self.current_root)
-        failed = []
         total_items = len(self.clipboard_buffer)
-        pd = QProgressDialog("Pasting...", "Abort", 0, total_items, self)
-        pd.setWindowModality(Qt.WindowModality.WindowModal) 
-        pd.show()
-        for i, (src, is_cut) in enumerate(list(self.clipboard_buffer)):
-            if pd.wasCanceled():
-                break
-            src_path = Path(src)
-            basename = src_path.name
-            dst = dest_dir / basename
-            pd.setValue(i + 1)
-            pd.setLabelText(f"Pasting: {basename}...")
-            try:
-                if is_cut:
-                    shutil.move(src, dst) 
-                else:
-                    if src_path.is_dir():
-                        shutil.copytree(src, dst) 
-                    else:
-                        shutil.copy2(src, dst) 
-            except Exception as e:
-                failed.append((src, str(e)))
-        pd.close()
+        
+        self.progress_dialog = QProgressDialog("Pasting...", "Abort", 0, total_items, self)
+        self.progress_dialog.setWindowModality(Qt.WindowModality.WindowModal) 
+        self.progress_dialog.canceled.connect(self.threadpool.clear)
+        self.progress_dialog.show()
+
+        worker = FileWorker(self.clipboard_buffer, dest_dir)
+        worker.signals.progress.connect(self._update_paste_progress)
+        worker.signals.finished.connect(self._handle_paste_finished)
+        
+        self.threadpool.start(worker)
+
+    def _update_paste_progress(self, index, filename):
+        if self.progress_dialog and not self.progress_dialog.wasCanceled():
+            self.progress_dialog.setValue(index)
+            self.progress_dialog.setLabelText(f"Pasting: {filename}...")
+
+    def _handle_paste_finished(self, failed, is_cut):
+        if self.progress_dialog:
+            self.progress_dialog.close()
+            self.progress_dialog = None
+            
         if is_cut:
             successful_moves = {item[0] for item in self.clipboard_buffer if item[0] not in [f[0] for f in failed]}
             self.clipboard_buffer = [item for item in self.clipboard_buffer if item[0] not in successful_moves]
+            
         self.refresh()
+        
         if failed:
             msg = "\n".join(f"{Path(p).name}: {e}" for p, e in failed)
             QMessageBox.warning(self, "Partial Failure", f"Some items failed to paste:\n{msg}")
